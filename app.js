@@ -1,63 +1,66 @@
-let pyodideReady = false;
-let pyodideInstance = null;
+let pyodideReadyPromise = loadPyodide();
 
-async function initPyodide() {
-    document.getElementById("output").textContent = "Loading Python (Pyodide)...";
-    pyodideInstance = await loadPyodide();
-    pyodideReady = true;
-    document.getElementById("output").textContent = "Python ready.";
-    document.getElementById("runBtn").disabled = false;
-}
+async function runDetector(text) {
+    const pyodide = await pyodideReadyPromise;
 
-initPyodide();
+    // load detector.py
+    await pyodide.FS.writeFile("detector.py", await (await fetch("detector.py")).text());
+    await pyodide.runPythonAsync(`import detector`);
 
-document.getElementById("runBtn").addEventListener("click", async () => {
-    if (!pyodideReady) return;
+    // write input text
+    pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
-    const fileInput = document.getElementById("fileInput");
-    if (!fileInput.files.length) {
-        alert("Please select a text file first.");
-        return;
-    }
-
-    const file = fileInput.files[0];
-    const text = await file.text();
-
-    document.getElementById("output").textContent = "Running hiatus detector...\n";
-
-    // --- load your detector.py into the python environment ---
-    const detectorCode = await fetch("detector.py").then(r => r.text());
-    pyodideInstance.runPython(detectorCode);
-
-    // --- write input text into Pyodide virtual FS ---
-    pyodideInstance.FS.writeFile("input.txt", text, { encoding: "utf8" });
-
-    // --- run your Python main() on the virtual input.txt ---
-    const result = pyodideInstance.runPython(`
+    // run detection (no CLI)
+    await pyodide.runPythonAsync(`
 from pathlib import Path
 from detector import detect_hiatus_in_text, write_outputs
 
-text = Path("input.txt").read_text(encoding="utf-8")
+text = Path("/app_input.txt").read_text(encoding="utf-8")
 annotated, occ = detect_hiatus_in_text(text)
-write_outputs(annotated, occ, Path("hiatus.html"), Path("hiatus.csv"))
-len(occ)
-`);
 
-    document.getElementById("output").textContent += `Done. Detected ${result} hiatuses.\nPreparing downloads...`;
+write_outputs(
+    annotated,
+    occ,
+    Path("/out.html"),
+    Path("/out.csv")
+)
+    `);
 
-    // --- read output files and trigger browser download ---
-    function downloadFile(name, mime) {
-        const data = pyodideInstance.FS.readFile(name, { encoding: "utf8" });
-        const blob = new Blob([data], { type: mime });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = name;
-        a.click();
+    // read outputs
+    const html = pyodide.FS.readFile("/out.html", { encoding: "utf8" });
+    const csv  = pyodide.FS.readFile("/out.csv",  { encoding: "utf8" });
+
+    return { html, csv };
+}
+
+document.getElementById("runBtn").onclick = async () => {
+    const input = document.getElementById("fileInput").files[0];
+    if (!input) {
+        alert("Please select a .txt file first.");
+        return;
     }
 
-    downloadFile("hiatus.html", "text/html");
-    downloadFile("hiatus.csv", "text/csv");
+    const status = document.getElementById("status");
+    const output = document.getElementById("output");
 
-    document.getElementById("output").textContent += "\nFiles downloaded.";
-});
+    status.textContent = "Loading Pyodide & running detector...";
+    output.innerHTML = "";
+
+    const text = await input.text();
+
+    try {
+        const result = await runDetector(text);
+        status.textContent = "Done!";
+
+        output.innerHTML = `
+            <h3>Annotated HTML Output</h3>
+            <div>${result.html}</div>
+
+            <h3>CSV Output</h3>
+            <pre>${result.csv}</pre>
+        `;
+    } catch (err) {
+        status.textContent = "Error running detector.";
+        console.error(err);
+    }
+};
