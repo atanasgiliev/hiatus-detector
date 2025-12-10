@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Hiatus Detector</title>
-<style>
-body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
-#output { margin-top: 1.5rem; font-family: monospace; white-space: pre-wrap; }
-</style>
+<meta charset="UTF-8" />
+<title>Hiatus Detector (Web Version)</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <h1>Greek Hiatus Detector</h1>
-<p>Select a UTF-8 text file. Processing happens entirely in your browser.</p>
 
-<input type="file" id="fileInput" accept=".txt"><br><br>
+<p>Select a UTF-8 Greek text file:</p>
+<input type="file" id="fileInput" accept=".txt">
 
-<button id="runBtn" disabled>Run Detector</button>
+<button id="runBtn">Run Hiatus Detector</button>
 
+<div id="status"></div>
+
+<h2>Output</h2>
 <div id="output"></div>
 
-<script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
 <script src="app.js"></script>
 
 </body>
