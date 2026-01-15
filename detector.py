@@ -1,4 +1,3 @@
-import argparse
 import csv
 import html
 import unicodedata
@@ -15,7 +14,7 @@ SMOOTH_BREATHING = "\u0313"
 ROUGH_BREATHING  = "\u0314"
 BREATHINGS = {SMOOTH_BREATHING, ROUGH_BREATHING}
 
-# NEW — breakers
+# breakers
 DASHES = {"—"}
 STRONG_PUNCTUATION = {".", ",", "·", ";", ":"}
 
@@ -33,60 +32,57 @@ BASE_VOWELS = "αεηιουω"
 def grapheme_clusters(s):
     clusters = []
     i = 0
-    N = len(s)
-    while i < N:
+    while i < len(s):
         start = i
         i += 1
-        while i < N and unicodedata.combining(s[i]) != 0:
+        while i < len(s) and unicodedata.combining(s[i]):
             i += 1
         clusters.append({"text": s[start:i], "start": start, "end": i})
     return clusters
 
 def base_letter(cluster_text):
-    nfd = unicodedata.normalize("NFD", cluster_text)
-    for ch in nfd:
-        if unicodedata.combining(ch) == 0:
+    for ch in unicodedata.normalize("NFD", cluster_text):
+        if not unicodedata.combining(ch):
             return ch.lower()
     return ""
 
 def contains_combining_diaeresis(cluster_text):
-    if any(ch in PRECOMPOSED_DIAERESIS for ch in cluster_text):
-        return True
-    return COMBINING_DIAERESIS in unicodedata.normalize("NFD", cluster_text)
+    return (
+        any(ch in PRECOMPOSED_DIAERESIS for ch in cluster_text)
+        or COMBINING_DIAERESIS in unicodedata.normalize("NFD", cluster_text)
+    )
 
 def contains_iota_subscript(cluster_text):
-    if IOTA_SUBSCRIPT in unicodedata.normalize("NFD", cluster_text):
-        return True
-    if IOTA_SUBSCRIPT in unicodedata.normalize("NFKD", cluster_text):
+    nfd = unicodedata.normalize("NFD", cluster_text)
+    if IOTA_SUBSCRIPT in nfd:
         return True
     for ch in cluster_text:
-        decomp = unicodedata.decomposition(ch)
-        if decomp and "0345" in decomp:
+        if "0345" in unicodedata.decomposition(ch):
             return True
     return cluster_text in PRECOMPOSED_IOTA_SUBS
 
-def has_rough_breathing(cluster_text):  # NEW
+def has_rough_breathing(cluster_text):
     return ROUGH_BREATHING in unicodedata.normalize("NFD", cluster_text)
 
 def is_vowel_cluster(cluster_text):
-    nfd = unicodedata.normalize("NFD", cluster_text)
-    bases = [c for c in nfd if unicodedata.combining(c) == 0]
-    return any(b.lower() in BASE_VOWELS for b in bases)
+    return any(
+        ch.lower() in BASE_VOWELS
+        for ch in unicodedata.normalize("NFD", cluster_text)
+        if not unicodedata.combining(ch)
+    )
 
 def is_punct_or_space_cluster(cluster_text):
     for ch in cluster_text:
         if ch.isspace():
             continue
-        cat = unicodedata.category(ch)
-        if cat.startswith(("P","S")):
+        if unicodedata.category(ch).startswith(("P","S")):
             continue
         return False
     return True
 
 def only_punct_space_between(text, a, b):
     for ch in text[a:b]:
-        cat = unicodedata.category(ch)
-        if cat.startswith(("L","N")):
+        if unicodedata.category(ch).startswith(("L","N")):
             return False
     return True
 
@@ -97,85 +93,77 @@ def detect_hiatus_in_text(
     text,
     treat_iota_as_diphthong=False,
     max_cluster_lookahead=8,
-    break_on_rough_breathing=False,   # NEW
-    break_on_dash=False,              # NEW
-    break_on_punctuation=False        # NEW
+    break_on_rough_breathing=False,
+    break_on_dash=False,
+    break_on_punctuation=False
 ):
     text = unicodedata.normalize("NFC", text)
     clusters = grapheme_clusters(text)
 
-    def line_number_at(idx):
-        return text.count("\n", 0, idx)
-
     for c in clusters:
-        c['line'] = line_number_at(c['start'])
+        c["line"] = text.count("\n", 0, c["start"])
 
-    line_to_idxs = defaultdict(list)
-    for idx, c in enumerate(clusters):
-        line_to_idxs[c['line']].append(idx)
+    line_map = defaultdict(list)
+    for i, c in enumerate(clusters):
+        line_map[c["line"]].append(i)
 
-    first_nonpunct = {}
-    last_nonpunct = {}
-    for ln, idxs in line_to_idxs.items():
+    first_np = {}
+    last_np = {}
+    for ln, idxs in line_map.items():
         first = last = None
-        for idx in idxs:
-            if is_punct_or_space_cluster(clusters[idx]['text']):
-                continue
-            if first is None:
-                first = idx
-            last = idx
-        first_nonpunct[ln] = first
-        last_nonpunct[ln] = last
+        for i in idxs:
+            if not is_punct_or_space_cluster(clusters[i]["text"]):
+                if first is None:
+                    first = i
+                last = i
+        first_np[ln] = first
+        last_np[ln] = last
 
     occurrences = []
 
     for i, ci in enumerate(clusters):
-        if not is_vowel_cluster(ci['text']):
+        if not is_vowel_cluster(ci["text"]):
             continue
 
         for j in range(i+1, min(i+1+max_cluster_lookahead, len(clusters))):
             cj = clusters[j]
-            if not is_vowel_cluster(cj['text']):
+            if not is_vowel_cluster(cj["text"]):
                 continue
 
-            intervening = text[ci['end']:cj['start']]
+            intervening = text[ci["end"]:cj["start"]]
             kind = None
 
             if "\n" in intervening:
-                if cj['line'] == ci['line'] + 1:
-                    if last_nonpunct.get(ci['line']) == i and first_nonpunct.get(cj['line']) == j:
+                if cj["line"] == ci["line"] + 1:
+                    if last_np[ci["line"]] == i and first_np[cj["line"]] == j:
                         kind = "across-line"
             elif intervening == "":
                 kind = "intra-word"
-            elif only_punct_space_between(text, ci['end'], cj['start']) and ci['line'] == cj['line']:
+            elif only_punct_space_between(text, ci["end"], cj["start"]) and ci["line"] == cj["line"]:
                 kind = "interword"
 
-            if kind is None:
+            if not kind:
                 continue
 
-            # --------- NEW BREAKER RULES ----------
-            if break_on_rough_breathing and has_rough_breathing(cj['text']):
+            if break_on_rough_breathing and has_rough_breathing(cj["text"]):
                 continue
-
             if break_on_dash and any(d in intervening for d in DASHES):
                 continue
-
             if break_on_punctuation and any(p in intervening for p in STRONG_PUNCTUATION):
                 continue
-            # -------------------------------------
 
             is_diph = False
             if kind == "intra-word":
-                pair = base_letter(ci['text']) + base_letter(cj['text'])
+                pair = base_letter(ci["text"]) + base_letter(cj["text"])
                 if pair in DIPHTHONGS:
                     is_diph = True
                 if treat_iota_as_diphthong and (
-                    contains_iota_subscript(ci['text']) or contains_iota_subscript(cj['text'])
+                    contains_iota_subscript(ci["text"]) or contains_iota_subscript(cj["text"])
                 ):
                     is_diph = True
-                if contains_combining_diaeresis(cj['text']):
+                if contains_combining_diaeresis(cj["text"]):
                     is_diph = False
-                if has_rough_breathing(ci['text']):
+                if has_rough_breathing(ci["text"]):
                     is_diph = False
 
             if is_diph:
@@ -183,74 +171,53 @@ def detect_hiatus_in_text(
 
             occurrences.append({
                 "kind": kind,
-                "start_pos": ci['start'],
-                "end_pos": cj['end'],
-                "cluster_i_text": ci['text'],
-                "cluster_j_text": cj['text'],
-                "line_i": ci['line'] + 1,
-                "line_j": cj['line'] + 1,
+                "start_pos": ci["start"],
+                "end_pos": cj["end"],
                 "i_index": i,
                 "j_index": j,
+                "line_i": ci["line"] + 1,
+                "line_j": cj["line"] + 1,
                 "intervening": intervening
             })
             break
 
-    # --------- expand vowel segments (unchanged) ----------
-    def safe_base(idx):
-        return base_letter(clusters[idx]['text']) if 0 <= idx < len(clusters) else ""
-
-    for occ in occurrences:
-        i = occ['i_index']
-        j = occ['j_index']
-        vi = [i]
-        vj = [j]
-
-        if i + 1 < j and safe_base(i) + safe_base(i + 1) in DIPHTHONGS:
-            vi = [i, i + 1]
-        elif i - 1 >= 0 and safe_base(i - 1) + safe_base(i) in DIPHTHONGS:
-            vi = [i - 1, i]
-
-        if j - 1 > i and safe_base(j - 1) + safe_base(j) in DIPHTHONGS:
-            vj = [j - 1, j]
-        elif j + 1 < len(clusters) and safe_base(j) + safe_base(j + 1) in DIPHTHONGS:
-            vj = [j, j + 1]
-
-        occ['vowel_i_indices'] = vi
-        occ['vowel_j_indices'] = vj
-        occ['vowel_i_text'] = "".join(clusters[k]['text'] for k in vi)
-        occ['vowel_j_text'] = "".join(clusters[k]['text'] for k in vj)
-
-    # annotate HTML
     cluster_marks = defaultdict(list)
     for n, occ in enumerate(occurrences, 1):
-        for k in occ['vowel_i_indices'] + occ['vowel_j_indices']:
-            cluster_marks[k].append(n)
+        cluster_marks[occ["i_index"]].append(n)
+        cluster_marks[occ["j_index"]].append(n)
 
-    html_parts = []
-    for k, cl in enumerate(clusters):
-        esc = html.escape(cl['text'])
-        if k in cluster_marks:
-            occ = occurrences[min(cluster_marks[k]) - 1]
+    html_out = []
+    for i, c in enumerate(clusters):
+        esc = html.escape(c["text"])
+        if i in cluster_marks:
+            kind = occurrences[cluster_marks[i][0]-1]["kind"]
             cls = {
                 "intra-word": "hiatus-intra",
                 "interword": "hiatus-inter",
                 "across-line": "hiatus-across"
-            }[occ['kind']]
-            html_parts.append(f'<span class="{cls}">{esc}</span>')
+            }[kind]
+            html_out.append(f'<span class="{cls}">{esc}</span>')
         else:
-            html_parts.append(esc)
+            html_out.append(esc)
 
-    return "".join(html_parts), occurrences
+    return "".join(html_out), occurrences
 
 # ---------------------------
-# process() — unchanged API
+# Output writer
+# ---------------------------
+def write_outputs(annotated, occurrences, html_path, csv_path):
+    html_path.write_text(annotated, encoding="utf-8")
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["index","kind","line_i","line_j"])
+        for i, o in enumerate(occurrences, 1):
+            writer.writerow([i, o["kind"], o["line_i"], o["line_j"]])
+
+# ---------------------------
+# process() — web API
 # ---------------------------
 def process(input_path, html_path, csv_path, **kwargs):
     text = Path(input_path).read_text(encoding="utf-8")
     annotated, occ = detect_hiatus_in_text(text, **kwargs)
     write_outputs(annotated, occ, Path(html_path), Path(csv_path))
     return occ
-
-if __name__ == "__main__":
-    main()
-    
