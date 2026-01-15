@@ -5,13 +5,13 @@ async function runDetector(text) {
 
     // load detector.py
     await pyodide.FS.writeFile("detector.py", await (await fetch("detector.py")).text());
-    await pyodide.runPythonAsync(import detector);
+    await pyodide.runPythonAsync(`import detector`);
 
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
     // run detection (no CLI)
-    await pyodide.runPythonAsync(
+    await pyodide.runPythonAsync(`
 from pathlib import Path
 from detector import detect_hiatus_in_text, write_outputs
 
@@ -24,7 +24,7 @@ write_outputs(
     Path("/out.html"),
     Path("/out.csv")
 )
-    );
+    `);
 
     // read outputs
     const html = pyodide.FS.readFile("/out.html", { encoding: "utf8" });
@@ -52,13 +52,13 @@ document.getElementById("runBtn").onclick = async () => {
         const result = await runDetector(text);
         status.textContent = "Done!";
 
-        output.innerHTML = 
+        output.innerHTML = `
             <h3>Annotated HTML Output</h3>
             <div>${result.html}</div>
 
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
-        ;
+        `;
     } catch (err) {
         status.textContent = "Error running detector.";
         console.error(err);
