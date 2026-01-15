@@ -221,3 +221,7 @@ def process(input_path, html_path, csv_path, **kwargs):
     annotated, occ = detect_hiatus_in_text(text, **kwargs)
     write_outputs(annotated, occ, Path(html_path), Path(csv_path))
     return occ
+
+if __name__ == "__main__":
+    main()
+
