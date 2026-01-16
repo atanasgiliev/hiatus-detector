@@ -10,19 +10,21 @@ async function runDetector(text) {
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
+    const breakOnRoughSecond = document.getElementById("optRoughSecond").checked;
+    const breakOnDash = document.getElementById("optDash").checked;
+    const breakOnPunct = document.getElementById("optPunct").checked;
+
     // run detection (no CLI)
     await pyodide.runPythonAsync(`
-from pathlib import Path
-from detector import detect_hiatus_in_text, write_outputs
+from detector import process
 
-text = Path("/app_input.txt").read_text(encoding="utf-8")
-annotated, occ = detect_hiatus_in_text(text)
-
-write_outputs(
-    annotated,
-    occ,
-    Path("/out.html"),
-    Path("/out.csv")
+process(
+    "/app_input.txt",
+    "/out.html",
+    "/out.csv",
+    break_on_rough_second=${breakOnRoughSecond},
+    break_on_dash=${breakOnDash},
+    break_on_punctuation=${breakOnPunct}
 )
     `);
 
