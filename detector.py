@@ -93,7 +93,13 @@ def only_punct_space_between(text, a, b):
 # ---------------------------
 # Core detection
 # ---------------------------
-def detect_hiatus_in_text(text, treat_iota_as_diphthong=False, max_cluster_lookahead=8):
+def detect_hiatus_in_text(text,
+    treat_iota_as_diphthong=False,
+    max_cluster_lookahead=8,
+    break_on_rough_second=False,
+    break_on_dash=False,
+    break_on_punctuation=False
+):
     """
     Detect hiatus occurrences. Returns:
       - annotated_text (HTML)
@@ -176,6 +182,25 @@ def detect_hiatus_in_text(text, treat_iota_as_diphthong=False, max_cluster_looka
                     is_diph = False
 
             if is_diph:
+                break
+
+            # ----- OPTIONAL hiatus-breaking rules -----
+
+            # 1. Rough breathing on second vowel
+            if break_on_rough_second and contains_breathing(cj['text']):
+                break
+
+            # 2. Em dash / long dash between vowels
+            if break_on_dash and any(ch in intervening for ch in ("—", "–", "-")):
+                break
+
+            # 3. Punctuation between vowels
+            if break_on_punctuation:
+                for ch in intervening:
+                    if ch in {".", ",", "·", ";", ":"}:
+                        break
+                else:
+                    pass
                 break
 
             occurrences.append({
@@ -372,7 +397,12 @@ def main():
     print("HTML:", Path(args.html).resolve())
     print("CSV :", Path(args.csv).resolve())
 
-def process(input_path: str, html_path: str, csv_path: str):
+def process(input_path: str,
+    html_path: str,
+    csv_path: str,
+    break_on_rough_second=False,
+    break_on_dash=False,
+    break_on_punctuation=False):
     """
     Minimal wrapper for the GUI / packaged app.
 
@@ -380,7 +410,10 @@ def process(input_path: str, html_path: str, csv_path: str):
     and RETURNS the occurrences list (so the GUI can inspect counts).
     """
     text = Path(input_path).read_text(encoding="utf-8")
-    annotated, occ = detect_hiatus_in_text(text)
+    annotated, occ = detect_hiatus_in_text(text,
+    break_on_rough_second=break_on_rough_second,
+    break_on_dash=break_on_dash,
+    break_on_punctuation=break_on_punctuation)
     write_outputs(annotated, occ, Path(html_path), Path(csv_path))
     return occ
 
