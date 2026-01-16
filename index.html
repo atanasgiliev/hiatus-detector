@@ -12,6 +12,25 @@
     <p>Select a UTF-8 Greek text file:</p> 
     <input type="file" id="fileInput" accept=".txt"> 
     
+    <fieldset style="margin-top: 1em;">
+      <legend>Optional Hiatus Rules</legend>
+      
+      <label>
+        <input type="checkbox" id="optRoughSecond">
+        Break if second vowel has rough breathing
+      </label><br>
+
+      <label>
+        <input type="checkbox" id="optDash">
+        Break if dash intervenes
+      </label><br>
+
+      <label>
+        <input type="checkbox" id="optPunct">
+        Break if punctuation intervenes
+      </label>
+    </fieldset>
+    
     <button id="runBtn">Run Hiatus Detector</button> 
     
     <div id="status"></div> 
