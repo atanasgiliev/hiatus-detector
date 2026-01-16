@@ -1,46 +1,33 @@
 let pyodideReadyPromise = loadPyodide();
 
-async function runDetector(text) {
+async function runDetector(text, options) {
     const pyodide = await pyodideReadyPromise;
 
     // load detector.py
-    await pyodide.FS.writeFile("detector.py", await (await fetch("detector.py")).text());
+    await pyodide.FS.writeFile(
+        "detector.py",
+        await (await fetch("detector.py")).text()
+    );
     await pyodide.runPythonAsync(`import detector`);
 
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
-    const breakOnRoughSecond = document.getElementById("optRoughSecond").checked;
-    const breakOnDash = document.getElementById("optDash").checked;
-    const breakOnPunct = document.getElementById("optPunct").checked;
-
-    // run detection (no CLI)
+    // pass options into Python
     await pyodide.runPythonAsync(`
-    import traceback
-    from pathlib import Path
-    from detector import detect_hiatus_in_text, write_outputs
+from pathlib import Path
+from detector import process
 
-    try:
-        text = Path("/app_input.txt").read_text(encoding="utf-8")
-
-        annotated, occ = detect_hiatus_in_text(text)
-
-        write_outputs(
-            annotated,
-            occ,
-            Path("/out.html"),
-            Path("/out.csv")
-        )
-
-        print("PYTHON OK")
-
-    except Exception as e:
-        print("PYTHON ERROR:")
-        traceback.print_exc()
-        raise
+process(
+    "/app_input.txt",
+    "/out.html",
+    "/out.csv",
+    break_on_rough_second=${options.breakRough},
+    break_on_dash=${options.breakDash},
+    break_on_punctuation=${options.breakPunct}
+)
     `);
 
-    // read outputs
     const html = pyodide.FS.readFile("/out.html", { encoding: "utf8" });
     const csv  = pyodide.FS.readFile("/out.csv",  { encoding: "utf8" });
 
@@ -57,13 +44,19 @@ document.getElementById("runBtn").onclick = async () => {
     const status = document.getElementById("status");
     const output = document.getElementById("output");
 
-    status.textContent = "Loading Pyodide & running detector...";
+    status.textContent = "Running hiatus detector…";
     output.innerHTML = "";
 
-    const text = await input.text();
+    const options = {
+        breakRough: document.getElementById("breakRough").checked,
+        breakDash: document.getElementById("breakDash").checked,
+        breakPunct: document.getElementById("breakPunct").checked
+    };
 
     try {
-        const result = await runDetector(text);
+        const text = await input.text();
+        const result = await runDetector(text, options);
+
         status.textContent = "Done!";
 
         output.innerHTML = `
