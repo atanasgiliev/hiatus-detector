@@ -78,8 +78,7 @@ document.getElementById("runBtn").onclick = async () => {
             <pre>${result.csv}</pre>
         `;
     } } catch (err) {
-    status.textContent = "Error running detector.";
-    alert(err);
-    console.error(err);
+        status.textContent = "Error running detector.";
+        console.error(err);
     }
 };
