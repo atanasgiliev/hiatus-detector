@@ -96,9 +96,6 @@ def only_punct_space_between(text, a, b):
 def detect_hiatus_in_text(text,
     treat_iota_as_diphthong=False,
     max_cluster_lookahead=8,
-    break_on_rough_second=False,
-    break_on_dash=False,
-    break_on_punctuation=False
 ):
     """
     Detect hiatus occurrences. Returns:
@@ -182,25 +179,6 @@ def detect_hiatus_in_text(text,
                     is_diph = False
 
             if is_diph:
-                break
-
-            # ----- OPTIONAL hiatus-breaking rules -----
-
-            # 1. Rough breathing on second vowel
-            if break_on_rough_second and contains_breathing(cj['text']):
-                break
-
-            # 2. Em dash / long dash between vowels
-            if break_on_dash and any(ch in intervening for ch in ("—", "–", "-")):
-                break
-
-            # 3. Punctuation between vowels
-            if break_on_punctuation:
-                for ch in intervening:
-                    if ch in {".", ",", "·", ";", ":"}:
-                        break
-                else:
-                    pass
                 break
 
             occurrences.append({
