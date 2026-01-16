@@ -11,20 +11,20 @@ async function runDetector(text) {
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
     // run detection (no CLI)
-    await pyodide.runPythonAsync(
-        from pathlib import Path
-        from detector import detect_hiatus_in_text, write_outputs
+    await pyodide.runPythonAsync(`
+from pathlib import Path
+from detector import detect_hiatus_in_text, write_outputs
 
-        text = Path("/app_input.txt").read_text(encoding="utf-8")
-        annotated, occ = detect_hiatus_in_text(text)
+text = Path("/app_input.txt").read_text(encoding="utf-8")
+annotated, occ = detect_hiatus_in_text(text)
 
-        write_outputs(
-            annotated,
-            occ,
-            Path("/out.html"),
-            Path("/out.csv")
-        )
-    );
+write_outputs(
+    annotated,
+    occ,
+    Path("/out.html"),
+    Path("/out.csv")
+)
+    `);
 
     // read outputs
     const html = pyodide.FS.readFile("/out.html", { encoding: "utf8" });
@@ -64,4 +64,3 @@ document.getElementById("runBtn").onclick = async () => {
         console.error(err);
     }
 };
-
