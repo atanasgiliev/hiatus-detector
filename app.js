@@ -16,24 +16,28 @@ async function runDetector(text) {
 
     // run detection (no CLI)
     await pyodide.runPythonAsync(`
+    import traceback
     from pathlib import Path
     from detector import detect_hiatus_in_text, write_outputs
 
-    text = Path("/app_input.txt").read_text(encoding="utf-8")
+    try:
+        text = Path("/app_input.txt").read_text(encoding="utf-8")
 
-    annotated, occ = detect_hiatus_in_text(
-        text,
-        break_on_rough_second=${breakOnRoughSecond},
-        break_on_dash=${breakOnDash},
-        break_on_punctuation=${breakOnPunct}
-    )
+        annotated, occ = detect_hiatus_in_text(text)
 
-    write_outputs(
-        annotated,
-        occ,
-        Path("/out.html"),
-        Path("/out.csv")
-    )
+        write_outputs(
+            annotated,
+            occ,
+            Path("/out.html"),
+            Path("/out.csv")
+        )
+
+        print("PYTHON OK")
+
+    except Exception as e:
+        print("PYTHON ERROR:")
+        traceback.print_exc()
+        raise
     `);
 
     // read outputs
