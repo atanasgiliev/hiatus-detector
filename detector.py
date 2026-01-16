@@ -397,12 +397,7 @@ def main():
     print("HTML:", Path(args.html).resolve())
     print("CSV :", Path(args.csv).resolve())
 
-def process(input_path: str,
-    html_path: str,
-    csv_path: str,
-    break_on_rough_second=False,
-    break_on_dash=False,
-    break_on_punctuation=False):
+def process(input_path: str, html_path: str, csv_path: str):
     """
     Minimal wrapper for the GUI / packaged app.
 
@@ -410,10 +405,7 @@ def process(input_path: str,
     and RETURNS the occurrences list (so the GUI can inspect counts).
     """
     text = Path(input_path).read_text(encoding="utf-8")
-    annotated, occ = detect_hiatus_in_text(text,
-    break_on_rough_second=break_on_rough_second,
-    break_on_dash=break_on_dash,
-    break_on_punctuation=break_on_punctuation)
+    annotated, occ = detect_hiatus_in_text(text)
     write_outputs(annotated, occ, Path(html_path), Path(csv_path))
     return occ
 
