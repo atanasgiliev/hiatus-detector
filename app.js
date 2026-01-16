@@ -1,44 +1,46 @@
 let pyodideReadyPromise = loadPyodide();
 
-async function runDetector(text, options) {
+async function runDetector(text) {
     const pyodide = await pyodideReadyPromise;
 
     // load detector.py
-    await pyodide.FS.writeFile(
-        "detector.py",
-        await (await fetch("detector.py")).text()
-    );
+    await pyodide.FS.writeFile("detector.py", await (await fetch("detector.py")).text());
     await pyodide.runPythonAsync(`import detector`);
 
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
-    // IMPORTANT: pass options as Python variables
+    const breakOnRoughSecond = document.getElementById("optRoughSecond").checked;
+    const breakOnDash = document.getElementById("optDash").checked;
+    const breakOnPunct = document.getElementById("optPunct").checked;
+
+    // run detection (no CLI)
     await pyodide.runPythonAsync(`
-from pathlib import Path
-from detector import detect_hiatus_in_text, write_outputs
+    import traceback
+    from pathlib import Path
+    from detector import detect_hiatus_in_text, write_outputs
 
-break_on_rough_second = ${options.breakRough}
-break_on_dash = ${options.breakDash}
-break_on_punctuation = ${options.breakPunct}
+    try:
+        text = Path("/app_input.txt").read_text(encoding="utf-8")
 
-text = Path("/app_input.txt").read_text(encoding="utf-8")
+        annotated, occ = detect_hiatus_in_text(text)
 
-annotated, occ = detect_hiatus_in_text(
-    text,
-    break_on_rough_second=break_on_rough_second,
-    break_on_dash=break_on_dash,
-    break_on_punctuation=break_on_punctuation
-)
+        write_outputs(
+            annotated,
+            occ,
+            Path("/out.html"),
+            Path("/out.csv")
+        )
 
-write_outputs(
-    annotated,
-    occ,
-    Path("/out.html"),
-    Path("/out.csv")
-)
+        print("PYTHON OK")
+
+    except Exception as e:
+        print("PYTHON ERROR:")
+        traceback.print_exc()
+        raise
     `);
 
+    // read outputs
     const html = pyodide.FS.readFile("/out.html", { encoding: "utf8" });
     const csv  = pyodide.FS.readFile("/out.csv",  { encoding: "utf8" });
 
@@ -55,19 +57,13 @@ document.getElementById("runBtn").onclick = async () => {
     const status = document.getElementById("status");
     const output = document.getElementById("output");
 
-    status.textContent = "Running hiatus detector…";
+    status.textContent = "Loading Pyodide & running detector...";
     output.innerHTML = "";
 
-    const options = {
-        breakRough: document.getElementById("breakRough").checked,
-        breakDash: document.getElementById("breakDash").checked,
-        breakPunct: document.getElementById("breakPunct").checked
-    };
+    const text = await input.text();
 
     try {
-        const text = await input.text();
-        const result = await runDetector(text, options);
-
+        const result = await runDetector(text);
         status.textContent = "Done!";
 
         output.innerHTML = `
@@ -77,7 +73,7 @@ document.getElementById("runBtn").onclick = async () => {
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
-    } } catch (err) {
+    } catch (err) {
         status.textContent = "Error running detector.";
         console.error(err);
     }
