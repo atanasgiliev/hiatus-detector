@@ -13,18 +13,29 @@ async function runDetector(text, options) {
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
-    // pass options into Python
+    // IMPORTANT: pass options as Python variables
     await pyodide.runPythonAsync(`
 from pathlib import Path
-from detector import process
+from detector import detect_hiatus_in_text, write_outputs
 
-process(
-    "/app_input.txt",
-    "/out.html",
-    "/out.csv",
-    break_on_rough_second=${options.breakRough},
-    break_on_dash=${options.breakDash},
-    break_on_punctuation=${options.breakPunct}
+break_on_rough_second = ${options.breakRough}
+break_on_dash = ${options.breakDash}
+break_on_punctuation = ${options.breakPunct}
+
+text = Path("/app_input.txt").read_text(encoding="utf-8")
+
+annotated, occ = detect_hiatus_in_text(
+    text,
+    break_on_rough_second=break_on_rough_second,
+    break_on_dash=break_on_dash,
+    break_on_punctuation=break_on_punctuation
+)
+
+write_outputs(
+    annotated,
+    occ,
+    Path("/out.html"),
+    Path("/out.csv")
 )
     `);
 
