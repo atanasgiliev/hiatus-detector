@@ -205,10 +205,6 @@ def detect_hiatus_in_text(text,
             
             # ----- OPTIONAL HIATUS BREAKERS -----
 
-            # 1) rough breathing on SECOND vowel
-            if break_on_rough_second and contains_rough_breathing(cj['text']):
-                continue
-
             # 2) dash between vowels
             if break_on_dash and any(d in intervening for d in DASHES):
                 continue
@@ -256,6 +252,31 @@ def detect_hiatus_in_text(text,
         if 0 <= idx < len(clusters):
             return base_letter(clusters[idx]['text'])
         return ""
+
+    def second_vowel_cluster_text(i_idx, j_idx):
+        """
+        Return the FULL vowel cluster text (diphthong-aware)
+        for the second vowel at j_idx.
+        """
+        indices = [j_idx]
+
+        # look left
+        if j_idx - 1 > i_idx:
+            if safe_base(j_idx - 1) + safe_base(j_idx) in DIPHTHONGS:
+                indices = [j_idx - 1, j_idx]
+
+        # look right
+        if j_idx + 1 < len(clusters):
+            if safe_base(j_idx) + safe_base(j_idx + 1) in DIPHTHONGS:
+                if j_idx + 1 > i_idx:
+                    indices.append(j_idx + 1)
+
+        return "".join(clusters[k]['text'] for k in indices)
+
+    if break_on_rough_second:
+        cj_full = second_vowel_cluster_text(i, j)
+        if contains_rough_breathing(cj_full):
+            continue
 
     for occ in occurrences:
         i_idx = occ['i_index']
