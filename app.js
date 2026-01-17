@@ -7,6 +7,19 @@ async function runDetector(text) {
     await pyodide.FS.writeFile("detector.py", await (await fetch("detector.py")).text());
     await pyodide.runPythonAsync(`import detector`);
 
+    const options = {
+    break_on_dash: document.getElementById("breakOnDash").checked,
+    break_on_punctuation: document.getElementById("breakOnPunctuation").checked,
+    break_on_rough_second: document.getElementById("breakOnRoughSecond").checked
+    };
+
+    // write options file exactly like input text
+    pyodide.FS.writeFile(
+        "/options.json",
+        JSON.stringify(options),
+        { encoding: "utf8" }
+    );
+
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
