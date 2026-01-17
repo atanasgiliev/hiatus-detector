@@ -73,6 +73,10 @@ def contains_breathing(cluster_text):
             return True
     return False
 
+def contains_rough_breathing(cluster_text):
+    nfd = unicodedata.normalize("NFD", cluster_text)
+    return "\u0314" in nfd
+
 def is_vowel_cluster(cluster_text):
     nfd = unicodedata.normalize("NFD", cluster_text)
     bases = [c for c in nfd if unicodedata.combining(c) == 0]
@@ -202,7 +206,7 @@ def detect_hiatus_in_text(text,
             # ----- OPTIONAL HIATUS BREAKERS -----
 
             # 1) rough breathing on SECOND vowel
-            if break_on_rough_second and contains_breathing(cj['text']):
+            if break_on_rough_second and contains_rough_breathing(cj['text']):
                 continue
 
             # 2) dash between vowels
