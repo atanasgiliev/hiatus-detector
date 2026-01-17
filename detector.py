@@ -2,6 +2,7 @@ import argparse
 import csv
 import html
 import unicodedata
+import json
 from pathlib import Path
 from collections import defaultdict
 
@@ -418,7 +419,10 @@ def main():
     annotated, occ = detect_hiatus_in_text(
         text,
         treat_iota_as_diphthong=args.iota_as_diphthong,
-        max_cluster_lookahead=args.max_lookahead
+        max_cluster_lookahead=args.max_lookahead,
+        break_on_dash=options.get("break_on_dash", False),
+        break_on_punctuation=options.get("break_on_punctuation", False),
+        break_on_rough_second=options.get("break_on_rough_second", False),
     )
     write_outputs(annotated, occ, Path(args.html), Path(args.csv))
     print(f"Done. {len(occ)} hiatus occurrences.")
