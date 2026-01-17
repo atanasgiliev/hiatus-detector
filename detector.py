@@ -20,6 +20,10 @@ PRECOMPOSED_IOTA_SUBS = {
 
 BASE_VOWELS = "αεηιουω"
 
+# ----- optional hiatus breakers (OFF by default) -----
+DASHES = {"—", "–", "-"}
+STRONG_PUNCTUATION = {".", ",", "·", ";", ":"}
+
 # ---------------------------
 # Grapheme cluster helpers
 # ---------------------------
@@ -90,12 +94,39 @@ def only_punct_space_between(text, a, b):
             return False
     return True
 
+def read_gui_options():
+    """
+    Reads GUI checkbox options if present.
+    Safe no-op if file does not exist.
+    """
+    opts = {
+        "break_on_rough_second": False,
+        "break_on_dash": False,
+        "break_on_punctuation": False,
+    }
+
+    opt_path = Path("/options.json")
+    if opt_path.exists():
+        try:
+            import json
+            data = json.loads(opt_path.read_text(encoding="utf-8"))
+            for k in opts:
+                if k in data:
+                    opts[k] = bool(data[k])
+        except Exception:
+            pass
+
+    return opts
+
 # ---------------------------
 # Core detection
 # ---------------------------
 def detect_hiatus_in_text(text,
     treat_iota_as_diphthong=False,
     max_cluster_lookahead=8,
+    break_on_rough_second=False,
+    break_on_dash=False,
+    break_on_punctuation=False,
 ):
     """
     Detect hiatus occurrences. Returns:
@@ -103,6 +134,10 @@ def detect_hiatus_in_text(text,
       - occurrences list
     """
     text = unicodedata.normalize("NFC", text)
+    gui_opts = read_gui_options()
+    break_on_rough_second = gui_opts["break_on_rough_second"]
+    break_on_dash = gui_opts["break_on_dash"]
+    break_on_punctuation = gui_opts["break_on_punctuation"]
     clusters = grapheme_clusters(text)
 
     def line_number_at(idx):
@@ -162,6 +197,21 @@ def detect_hiatus_in_text(text,
 
             if kind is None:
                 continue
+            
+            # ----- OPTIONAL HIATUS BREAKERS -----
+
+            # 1) rough breathing on SECOND vowel
+            if break_on_rough_second and contains_breathing(cj['text']):
+                continue
+
+            # 2) dash between vowels
+            if break_on_dash and any(d in intervening for d in DASHES):
+                continue
+
+            # 3) strong punctuation between vowels
+            if break_on_punctuation and any(p in intervening for p in STRONG_PUNCTUATION):
+                continue
+
 
             # DIPHTHONG/HIATUS decision
             is_diph = False
