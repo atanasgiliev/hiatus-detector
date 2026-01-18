@@ -1,46 +1,95 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" /> 
-    <title>Hiatus Detector (Web Version)</title> 
-    <link rel="stylesheet" href="style.css"> 
-  </head> 
-  <body> 
-    
-    <h1>Greek Hiatus Detector</h1> 
-    
-    <p>Select a UTF-8 Greek text file please:</p> 
-    <input type="file" id="fileInput" accept=".txt"> 
-    
-    <fieldset style="margin-top: 1em;">
-      <legend>Optional Hiatus Rules (New Features May Contain Bugs)</legend>
-      
-      <label>
-        <input type="checkbox" id="breakOnDash">
-        Break on dash
-      </label>
+<head>
+  <meta charset="UTF-8" />
+  <title>Greek Hiatus Detector</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-      <label>
-        <input type="checkbox" id="breakOnPunctuation">
-        Break on punctuation
-      </label>
+  <div class="container">
 
-      <label>
-        <input type="checkbox" id="breakOnRoughSecond">
-        Break on rough breathing (second vowel)
+    <header>
+      <h1>Greek Hiatus Detector</h1>
+      <p class="subtitle">
+        An analytical tool for identifying vowel hiatus in Ancient Greek texts
+      </p>
+    </header>
+
+    <!-- File input -->
+    <section class="panel">
+      <label class="file-label">
+        Select a UTF-8 encoded Greek text file
       </label>
-    </fieldset>
-    
-    <button id="runBtn">Run Hiatus Detector</button> 
-    
-    <div id="status"></div> 
-    
-    <h2>Output</h2> 
-    <div id="output"></div> 
-    
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js">
-      </script> 
-    <script src="app.js"></script> 
-  
-  </body> 
+      <input type="file" id="fileInput" accept=".txt">
+    </section>
+
+    <!-- Options -->
+    <section class="panel options">
+      <fieldset>
+        <legend>Optional Hiatus Rules</legend>
+
+        <label class="option">
+          <input type="checkbox" id="breakOnDash">
+          Break hiatus when a dash intervenes
+        </label>
+
+        <label class="option">
+          <input type="checkbox" id="breakOnPunctuation">
+          Break hiatus across strong punctuation
+        </label>
+
+        <label class="option">
+          <input type="checkbox" id="breakOnRoughSecond">
+          Break hiatus if second vowel has rough breathing
+        </label>
+
+        <p class="note">
+          These options are experimental and disabled by default.
+        </p>
+      </fieldset>
+    </section>
+
+    <!-- Run -->
+    <section class="panel actions">
+      <button id="runBtn">Run Hiatus Detector</button>
+      <div id="status"></div>
+    </section>
+
+    <!-- Legend -->
+    <section class="panel legend">
+      <h2>Highlight Legend</h2>
+      <ul>
+        <li><span class="legend-box intra"></span> Red — Word-internal hiatus (I)</li>
+        <li><span class="legend-box inter"></span> Green — Inter-word hiatus (B)</li>
+        <li><span class="legend-box across"></span> Blue — Across-line hiatus (V)</li>
+      </ul>
+    </section>
+
+    <!-- Output -->
+    <section class="panel output">
+      <h2>Output</h2>
+
+      <div class="downloads">
+        <button disabled>Download HTML</button>
+        <button disabled>Download CSV</button>
+        <span class="download-note">(enabled after analysis)</span>
+      </div>
+
+      <div id="output"></div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>
+        Greek Hiatus Detector by Atanas G. Iliev· Research Tool for Classical Philology<br>
+      </p>
+    </footer>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script src="app.js"></script>
+
+</body>
 </html>
