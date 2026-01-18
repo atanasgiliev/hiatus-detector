@@ -1,19 +1,26 @@
 let pyodideReadyPromise = loadPyodide();
 
+// store outputs for download buttons
+let lastHtmlOutput = null;
+let lastCsvOutput = null;
+
 async function runDetector(text) {
     const pyodide = await pyodideReadyPromise;
 
     // load detector.py
-    await pyodide.FS.writeFile("detector.py", await (await fetch("detector.py")).text());
+    await pyodide.FS.writeFile(
+        "detector.py",
+        await (await fetch("detector.py")).text()
+    );
     await pyodide.runPythonAsync(`import detector`);
 
     const options = {
-    break_on_dash: document.getElementById("breakOnDash").checked,
-    break_on_punctuation: document.getElementById("breakOnPunctuation").checked,
-    break_on_rough_second: document.getElementById("breakOnRoughSecond").checked
+        break_on_dash: document.getElementById("breakOnDash").checked,
+        break_on_punctuation: document.getElementById("breakOnPunctuation").checked,
+        break_on_rough_second: document.getElementById("breakOnRoughSecond").checked
     };
 
-    // write options file exactly like input text
+    // write options file
     pyodide.FS.writeFile(
         "/options.json",
         JSON.stringify(options),
@@ -23,7 +30,7 @@ async function runDetector(text) {
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
-    // run detection (no CLI)
+    // run detection (NO CLI, NO process())
     await pyodide.runPythonAsync(`
 from pathlib import Path
 from detector import detect_hiatus_in_text, write_outputs
@@ -46,6 +53,20 @@ write_outputs(
     return { html, csv };
 }
 
+function downloadFile(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+}
+
 document.getElementById("runBtn").onclick = async () => {
     const input = document.getElementById("fileInput").files[0];
     if (!input) {
@@ -59,10 +80,14 @@ document.getElementById("runBtn").onclick = async () => {
     status.textContent = "Loading Pyodide & running detector...";
     output.innerHTML = "";
 
-    const text = await input.text();
-
     try {
+        const text = await input.text();
         const result = await runDetector(text);
+
+        // store for downloads
+        lastHtmlOutput = result.html;
+        lastCsvOutput  = result.csv;
+
         status.textContent = "Done!";
 
         output.innerHTML = `
@@ -72,8 +97,26 @@ document.getElementById("runBtn").onclick = async () => {
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
+
+        // enable download buttons
+        document.getElementById("downloadHtmlBtn").disabled = false;
+        document.getElementById("downloadCsvBtn").disabled = false;
+
     } catch (err) {
         status.textContent = "Error running detector.";
         console.error(err);
+    }
+};
+
+// download button handlers
+document.getElementById("downloadHtmlBtn").onclick = () => {
+    if (lastHtmlOutput !== null) {
+        downloadFile("hiatus_output.html", lastHtmlOutput, "text/html");
+    }
+};
+
+document.getElementById("downloadCsvBtn").onclick = () => {
+    if (lastCsvOutput !== null) {
+        downloadFile("hiatus_output.csv", lastCsvOutput, "text/csv");
     }
 };
