@@ -108,6 +108,11 @@ def read_gui_options():
         "break_on_rough_second": False,
         "break_on_dash": False,
         "break_on_punctuation": False,
+
+        # NEW: which hiatus types to detect
+        "detect_intra": True,
+        "detect_inter": True,
+        "detect_across": True,
     }
 
     opt_path = Path("/options.json")
@@ -143,6 +148,9 @@ def detect_hiatus_in_text(text,
     break_on_rough_second = gui_opts["break_on_rough_second"]
     break_on_dash = gui_opts["break_on_dash"]
     break_on_punctuation = gui_opts["break_on_punctuation"]
+    detect_intra = gui_opts["detect_intra"]
+    detect_inter = gui_opts["detect_inter"]
+    detect_across = gui_opts["detect_across"]
     clusters = grapheme_clusters(text)
 
     def line_number_at(idx):
@@ -226,6 +234,14 @@ def detect_hiatus_in_text(text,
                 kind = None
 
             if kind is None:
+                continue
+                
+            # ----- FILTER BY HIATUS TYPE (GUI CHECKBOXES) -----
+            if kind == "intra-word" and not detect_intra:
+                continue
+            if kind == "interword" and not detect_inter:
+                continue
+            if kind == "across-line" and not detect_across:
                 continue
             
             # ----- OPTIONAL HIATUS BREAKERS -----
