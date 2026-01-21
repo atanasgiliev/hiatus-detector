@@ -150,6 +150,7 @@ document.getElementById("runBtn").onclick = async () => {
 
     try {
         const text = await input.text();
+        const lineCount = text.split(/\r?\n/).filter(l => l.trim() !== "").length; 
         const result = await runDetector(text);
 
         // store for downloads
@@ -157,6 +158,10 @@ document.getElementById("runBtn").onclick = async () => {
         lastCsvOutput  = result.csv;
 
         const counts = countHiatusFromCsv(result.csv);
+        const hiatusPerLine = lineCount > 0
+           ? (counts.total / lineCount).toFixed(3)
+           : "0.000";
+
 
         status.textContent = "Done!";
 
@@ -167,6 +172,7 @@ document.getElementById("runBtn").onclick = async () => {
                 <li>Inter-word (B): ${counts.B}</li>
                 <li>Across-line (V): ${counts.V}</li>
                 <li><strong>Total: ${counts.total}</strong></li>
+                <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
             </ul>
 
             <h3>Annotated HTML Output</h3>
