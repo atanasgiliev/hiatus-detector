@@ -4,6 +4,62 @@ let pyodideReadyPromise = loadPyodide();
 let lastHtmlOutput = null;
 let lastCsvOutput = null;
 
+/* ----------------------------
+   RUN BUTTON ENABLE / DISABLE
+----------------------------- */
+
+function updateRunButtonState() {
+    const intra  = document.getElementById("detectIntra").checked;
+    const inter  = document.getElementById("detectInter").checked;
+    const across = document.getElementById("detectAcross").checked;
+
+    document.getElementById("runBtn").disabled = !(intra || inter || across);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    updateRunButtonState();
+
+    ["detectIntra", "detectInter", "detectAcross"].forEach(id => {
+        document.getElementById(id).addEventListener(
+            "change",
+            updateRunButtonState
+        );
+    });
+});
+
+/* ----------------------------
+   CSV → HIATUS COUNTS
+----------------------------- */
+
+function countHiatusFromCsv(csvText) {
+    const lines = csvText.trim().split("\n");
+    lines.shift(); // remove header
+
+    const counts = {
+        I: 0,
+        B: 0,
+        V: 0,
+        total: 0
+    };
+
+    for (const line of lines) {
+        if (!line.trim()) continue;
+        const cols = line.split(",");
+        const kind = cols[1];
+
+        if (kind === "I" || kind === "B" || kind === "V") {
+            counts[kind]++;
+            counts.total++;
+        }
+    }
+
+    return counts;
+}
+
+/* ----------------------------
+   CORE DETECTOR RUN
+----------------------------- */
+
 async function runDetector(text) {
     const pyodide = await pyodideReadyPromise;
 
@@ -18,7 +74,7 @@ async function runDetector(text) {
         break_on_dash: document.getElementById("breakOnDash").checked,
         break_on_punctuation: document.getElementById("breakOnPunctuation").checked,
         break_on_rough_second: document.getElementById("breakOnRoughSecond").checked,
-        
+
         detect_intra: document.getElementById("detectIntra").checked,
         detect_inter: document.getElementById("detectInter").checked,
         detect_across: document.getElementById("detectAcross").checked
@@ -34,7 +90,7 @@ async function runDetector(text) {
     // write input text
     pyodide.FS.writeFile("/app_input.txt", text, { encoding: "utf8" });
 
-    // run detection (NO CLI, NO process())
+    // run detection
     await pyodide.runPythonAsync(`
 from pathlib import Path
 from detector import detect_hiatus_in_text, write_outputs
@@ -57,6 +113,10 @@ write_outputs(
     return { html, csv };
 }
 
+/* ----------------------------
+   FILE DOWNLOADS
+----------------------------- */
+
 function downloadFile(filename, content, mime) {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -70,6 +130,10 @@ function downloadFile(filename, content, mime) {
 
     URL.revokeObjectURL(url);
 }
+
+/* ----------------------------
+   RUN BUTTON HANDLER
+----------------------------- */
 
 document.getElementById("runBtn").onclick = async () => {
     const input = document.getElementById("fileInput").files[0];
@@ -92,9 +156,19 @@ document.getElementById("runBtn").onclick = async () => {
         lastHtmlOutput = result.html;
         lastCsvOutput  = result.csv;
 
+        const counts = countHiatusFromCsv(result.csv);
+
         status.textContent = "Done!";
 
         output.innerHTML = `
+            <h3>Hiatus Counts</h3>
+            <ul>
+                <li>Intra-word (I): ${counts.I}</li>
+                <li>Inter-word (B): ${counts.B}</li>
+                <li>Across-line (V): ${counts.V}</li>
+                <li><strong>Total: ${counts.total}</strong></li>
+            </ul>
+
             <h3>Annotated HTML Output</h3>
             <div>${result.html}</div>
 
@@ -112,7 +186,10 @@ document.getElementById("runBtn").onclick = async () => {
     }
 };
 
-// download button handlers
+/* ----------------------------
+   DOWNLOAD BUTTONS
+----------------------------- */
+
 document.getElementById("downloadHtmlBtn").onclick = () => {
     if (lastHtmlOutput !== null) {
         downloadFile("hiatus_output.html", lastHtmlOutput, "text/html");
