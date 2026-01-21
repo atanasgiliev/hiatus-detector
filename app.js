@@ -17,7 +17,11 @@ async function runDetector(text) {
     const options = {
         break_on_dash: document.getElementById("breakOnDash").checked,
         break_on_punctuation: document.getElementById("breakOnPunctuation").checked,
-        break_on_rough_second: document.getElementById("breakOnRoughSecond").checked
+        break_on_rough_second: document.getElementById("breakOnRoughSecond").checked,
+        
+        detect_intra: document.getElementById("detectIntra").checked,
+        detect_inter: document.getElementById("detectInter").checked,
+        detect_across: document.getElementById("detectAcross").checked
     };
 
     // write options file
