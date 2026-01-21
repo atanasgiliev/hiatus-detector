@@ -27,6 +27,28 @@
     <!-- Options -->
     <section class="panel options">
       <fieldset>
+        <legend>Hiatus Types to Detect</legend>
+
+        <label class="option">
+          <input type="checkbox" id="detectIntra" checked>
+          Word-internal hiatus (within a single word)
+        </label>
+
+        <label class="option">
+          <input type="checkbox" id="detectInter" checked>
+          Inter-word hiatus (across word boundary)
+        </label>
+
+        <label class="option">
+          <input type="checkbox" id="detectAcross" checked>
+          Across-line hiatus (line-final to line-initial)
+        </label>
+
+        <p class="note">
+          At least one hiatus type must be selected.
+        </p>
+      </fieldset>
+      <fieldset>
         <legend>Optional Hiatus Rules</legend>
 
         <label class="option">
