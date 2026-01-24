@@ -240,14 +240,14 @@ document.getElementById("runBtn").onclick = async () => {
                 <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
             </ul>
 
-            <h3>Hiatus per Line</h3>
-            ${renderHiatusTable(perLineCounts)}
-
             <h3>Annotated HTML Output</h3>
             <div>${result.html}</div>
 
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
+
+            <h3>Hiatus per Line</h3>
+            ${renderHiatusTable(perLineCounts)}
         `;
 
         document.getElementById("downloadHtmlBtn").disabled = false;
