@@ -70,11 +70,20 @@
           These options are disabled by default.
         </p>
       </fieldset>
+      <fieldset>
+        <legend>Output Options</legend>
+
+        <label class="option">
+          <input type="checkbox" id="showPerLineTable" checked>
+          Show per-line hiatus table
+        </label>
+      </fieldset>
+
     </section>
 
     <!-- Run -->
     <section class="panel actions">
-      <button id="runBtn">Run Hiatus Detector</button>
+      <button id="runBtn" disabled>Run Hiatus Detector</button>
       <div id="status"></div>
     </section>
 
@@ -95,8 +104,10 @@
       <div class="downloads">
         <button id="downloadHtmlBtn" disabled>Download HTML</button>
         <button id="downloadCsvBtn" disabled>Download CSV</button>
+        <button id="downloadPerLineCsvBtn" disabled>Download Per-Line CSV</button>
         <span class="download-note">(enabled after analysis)</span>
       </div>
+
 
       <div id="output"></div>
     </section>
