@@ -25,6 +25,10 @@ document.addEventListener("DOMContentLoaded", () => {
             updateRunButtonState
         );
     });
+
+    // ensure download buttons start disabled
+    document.getElementById("downloadHtmlBtn").disabled = true;
+    document.getElementById("downloadCsvBtn").disabled  = true;
 });
 
 /* ----------------------------
@@ -135,75 +139,78 @@ function downloadFile(filename, content, mime) {
    RUN BUTTON HANDLER
 ----------------------------- */
 
-document.getElementById("runBtn").onclick = async () => {
-    const input = document.getElementById("fileInput").files[0];
-    if (!input) {
-        alert("Please select a .txt file first.");
-        return;
-    }
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("runBtn").onclick = async () => {
+        const input = document.getElementById("fileInput").files[0];
+        if (!input) {
+            alert("Please select a .txt file first.");
+            return;
+        }
 
-    const status = document.getElementById("status");
-    const output = document.getElementById("output");
+        const status = document.getElementById("status");
+        const output = document.getElementById("output");
 
-    status.textContent = "Loading Pyodide & running detector...";
-    output.innerHTML = "";
+        status.textContent = "Loading Pyodide & running detector...";
+        output.innerHTML = "";
 
-    try {
-        const text = await input.text();
-        const lineCount = text.split(/\r?\n/).filter(l => l.trim() !== "").length; 
-        const result = await runDetector(text);
+        try {
+            const text = await input.text();
+            const lineCount = text.split(/\r?\n/).filter(l => l.trim() !== "").length;
+            const result = await runDetector(text);
 
-        // store for downloads
-        lastHtmlOutput = result.html;
-        lastCsvOutput  = result.csv;
+            // store for downloads
+            lastHtmlOutput = result.html;
+            lastCsvOutput  = result.csv;
 
-        const counts = countHiatusFromCsv(result.csv);
-        const hiatusPerLine = lineCount > 0
-           ? (counts.total / lineCount).toFixed(3)
-           : "0.000";
+            const counts = countHiatusFromCsv(result.csv);
+            const hiatusPerLine = lineCount > 0
+               ? (counts.total / lineCount).toFixed(3)
+               : "0.000";
 
+            status.textContent = "Done!";
 
-        status.textContent = "Done!";
+            output.innerHTML = `
+                <h3>Hiatus Counts</h3>
+                <ul>
+                    <li>Intra-word (I): ${counts.I}</li>
+                    <li>Inter-word (B): ${counts.B}</li>
+                    <li>Across-line (V): ${counts.V}</li>
+                    <li><strong>Total: ${counts.total}</strong></li>
+                    <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
+                </ul>
 
-        output.innerHTML = `
-            <h3>Hiatus Counts</h3>
-            <ul>
-                <li>Intra-word (I): ${counts.I}</li>
-                <li>Inter-word (B): ${counts.B}</li>
-                <li>Across-line (V): ${counts.V}</li>
-                <li><strong>Total: ${counts.total}</strong></li>
-                <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
-            </ul>
+                <h3>Annotated HTML Output</h3>
+                <div>${result.html}</div>
 
-            <h3>Annotated HTML Output</h3>
-            <div>${result.html}</div>
+                <h3>CSV Output</h3>
+                <pre>${result.csv}</pre>
+            `;
 
-            <h3>CSV Output</h3>
-            <pre>${result.csv}</pre>
-        `;
+            // enable download buttons
+            document.getElementById("downloadHtmlBtn").disabled = false;
+            document.getElementById("downloadCsvBtn").disabled  = false;
 
-        // enable download buttons
-        document.getElementById("downloadHtmlBtn").disabled = false;
-        document.getElementById("downloadCsvBtn").disabled = false;
-
-    } catch (err) {
-        status.textContent = "Error running detector.";
-        console.error(err);
-    }
-};
+        } catch (err) {
+            status.textContent = "Error running detector.";
+            console.error(err);
+        }
+    };
+});
 
 /* ----------------------------
    DOWNLOAD BUTTONS
 ----------------------------- */
 
-document.getElementById("downloadHtmlBtn").onclick = () => {
-    if (lastHtmlOutput !== null) {
-        downloadFile("hiatus_output.html", lastHtmlOutput, "text/html");
-    }
-};
+document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("downloadHtmlBtn").onclick = () => {
+        if (lastHtmlOutput !== null) {
+            downloadFile("hiatus_output.html", lastHtmlOutput, "text/html");
+        }
+    };
 
-document.getElementById("downloadCsvBtn").onclick = () => {
-    if (lastCsvOutput !== null) {
-        downloadFile("hiatus_output.csv", lastCsvOutput, "text/csv");
-    }
-};
+    document.getElementById("downloadCsvBtn").onclick = () => {
+        if (lastCsvOutput !== null) {
+            downloadFile("hiatus_output.csv", lastCsvOutput, "text/csv");
+        }
+    };
+});
