@@ -25,10 +25,6 @@ document.addEventListener("DOMContentLoaded", () => {
             updateRunButtonState
         );
     });
-
-    // ensure download buttons start disabled
-    document.getElementById("downloadHtmlBtn").disabled = true;
-    document.getElementById("downloadCsvBtn").disabled  = true;
 });
 
 /* ----------------------------
@@ -58,6 +54,60 @@ function countHiatusFromCsv(csvText) {
     }
 
     return counts;
+}
+
+/* ----------------------------
+   CSV → PER-LINE HIATUS TABLE
+----------------------------- */
+
+function countHiatusPerLine(csvText) {
+    const lines = csvText.trim().split("\n");
+    lines.shift(); // remove header
+
+    const perLine = {};
+
+    for (const line of lines) {
+        if (!line.trim()) continue;
+        const cols = line.split(",");
+        const lineNumber = parseInt(cols[0], 10); // assumes first column = line number
+
+        if (!isNaN(lineNumber)) {
+            perLine[lineNumber] = (perLine[lineNumber] || 0) + 1;
+        }
+    }
+
+    return perLine;
+}
+
+function renderHiatusTable(perLineCounts) {
+    const lineNumbers = Object.keys(perLineCounts)
+        .map(Number)
+        .sort((a, b) => a - b);
+
+    if (lineNumbers.length === 0) {
+        return "<p><em>No hiatus instances found.</em></p>";
+    }
+
+    let rows = lineNumbers.map(n => `
+        <tr>
+            <td>${n}</td>
+            <td>${perLineCounts[n]}</td>
+        </tr>
+    `).join("");
+
+    return `
+        <table border="1" cellpadding="6" cellspacing="0">
+            <thead>
+                <tr>
+                    <th>Line</th>
+                    <th>Hiatus Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+        </table>
+    `;
 }
 
 /* ----------------------------
@@ -139,78 +189,77 @@ function downloadFile(filename, content, mime) {
    RUN BUTTON HANDLER
 ----------------------------- */
 
-document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("runBtn").onclick = async () => {
-        const input = document.getElementById("fileInput").files[0];
-        if (!input) {
-            alert("Please select a .txt file first.");
-            return;
-        }
+document.getElementById("runBtn").onclick = async () => {
+    const input = document.getElementById("fileInput").files[0];
+    if (!input) {
+        alert("Please select a .txt file first.");
+        return;
+    }
 
-        const status = document.getElementById("status");
-        const output = document.getElementById("output");
+    const status = document.getElementById("status");
+    const output = document.getElementById("output");
 
-        status.textContent = "Loading Pyodide & running detector...";
-        output.innerHTML = "";
+    status.textContent = "Loading Pyodide & running detector...";
+    output.innerHTML = "";
 
-        try {
-            const text = await input.text();
-            const lineCount = text.split(/\r?\n/).filter(l => l.trim() !== "").length;
-            const result = await runDetector(text);
+    try {
+        const text = await input.text();
+        const lineCount = text.split(/\r?\n/).filter(l => l.trim() !== "").length;
+        const result = await runDetector(text);
 
-            // store for downloads
-            lastHtmlOutput = result.html;
-            lastCsvOutput  = result.csv;
+        // store for downloads
+        lastHtmlOutput = result.html;
+        lastCsvOutput  = result.csv;
 
-            const counts = countHiatusFromCsv(result.csv);
-            const hiatusPerLine = lineCount > 0
-               ? (counts.total / lineCount).toFixed(3)
-               : "0.000";
+        const counts = countHiatusFromCsv(result.csv);
+        const perLineCounts = countHiatusPerLine(result.csv);
+        const hiatusPerLine = lineCount > 0
+            ? (counts.total / lineCount).toFixed(3)
+            : "0.000";
 
-            status.textContent = "Done!";
+        status.textContent = "Done!";
 
-            output.innerHTML = `
-                <h3>Hiatus Counts</h3>
-                <ul>
-                    <li>Intra-word (I): ${counts.I}</li>
-                    <li>Inter-word (B): ${counts.B}</li>
-                    <li>Across-line (V): ${counts.V}</li>
-                    <li><strong>Total: ${counts.total}</strong></li>
-                    <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
-                </ul>
+        output.innerHTML = `
+            <h3>Hiatus Counts</h3>
+            <ul>
+                <li>Intra-word (I): ${counts.I}</li>
+                <li>Inter-word (B): ${counts.B}</li>
+                <li>Across-line (V): ${counts.V}</li>
+                <li><strong>Total: ${counts.total}</strong></li>
+                <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
+            </ul>
 
-                <h3>Annotated HTML Output</h3>
-                <div>${result.html}</div>
+            <h3>Hiatus per Line</h3>
+            ${renderHiatusTable(perLineCounts)}
 
-                <h3>CSV Output</h3>
-                <pre>${result.csv}</pre>
-            `;
+            <h3>Annotated HTML Output</h3>
+            <div>${result.html}</div>
 
-            // enable download buttons
-            document.getElementById("downloadHtmlBtn").disabled = false;
-            document.getElementById("downloadCsvBtn").disabled  = false;
+            <h3>CSV Output</h3>
+            <pre>${result.csv}</pre>
+        `;
 
-        } catch (err) {
-            status.textContent = "Error running detector.";
-            console.error(err);
-        }
-    };
-});
+        document.getElementById("downloadHtmlBtn").disabled = false;
+        document.getElementById("downloadCsvBtn").disabled = false;
+
+    } catch (err) {
+        status.textContent = "Error running detector.";
+        console.error(err);
+    }
+};
 
 /* ----------------------------
    DOWNLOAD BUTTONS
 ----------------------------- */
 
-document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("downloadHtmlBtn").onclick = () => {
-        if (lastHtmlOutput !== null) {
-            downloadFile("hiatus_output.html", lastHtmlOutput, "text/html");
-        }
-    };
+document.getElementById("downloadHtmlBtn").onclick = () => {
+    if (lastHtmlOutput !== null) {
+        downloadFile("hiatus_output.html", lastHtmlOutput, "text/html");
+    }
+};
 
-    document.getElementById("downloadCsvBtn").onclick = () => {
-        if (lastCsvOutput !== null) {
-            downloadFile("hiatus_output.csv", lastCsvOutput, "text/csv");
-        }
-    };
-});
+document.getElementById("downloadCsvBtn").onclick = () => {
+    if (lastCsvOutput !== null) {
+        downloadFile("hiatus_output.csv", lastCsvOutput, "text/csv");
+    }
+};
