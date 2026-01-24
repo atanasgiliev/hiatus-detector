@@ -3,7 +3,11 @@ let pyodideReadyPromise = loadPyodide();
 // store outputs for download buttons
 let lastHtmlOutput = null;
 let lastCsvOutput = null;
-let lastPerLineCsv = null;
+let lastPerLineCounts = null;
+let lastLineCount = 0;
+
+// sorting state
+let currentSort = { column: "line", asc: true };
 
 /* ----------------------------
    RUN BUTTON ENABLE / DISABLE
@@ -21,10 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateRunButtonState();
 
     ["detectIntra", "detectInter", "detectAcross"].forEach(id => {
-        document.getElementById(id).addEventListener(
-            "change",
-            updateRunButtonState
-        );
+        document.getElementById(id).addEventListener("change", updateRunButtonState);
     });
 });
 
@@ -62,38 +63,91 @@ function countHiatusPerLine(csvText, lineCount) {
 
     for (const row of rows) {
         if (!row.trim()) continue;
-        const field = row.split(",")[2];
-        if (!field) continue;
+        const lineField = row.split(",")[2];
+        if (!lineField) continue;
 
-        if (field.includes("-")) {
-            const [a, b] = field.split("-").map(Number);
+        if (lineField.includes("-")) {
+            const [a, b] = lineField.split("-").map(Number);
             if (perLine[a] !== undefined) perLine[a]++;
             if (perLine[b] !== undefined) perLine[b]++;
         } else {
-            const n = parseInt(field, 10);
+            const n = parseInt(lineField, 10);
             if (perLine[n] !== undefined) perLine[n]++;
         }
     }
     return perLine;
 }
 
-function heatColor(value, max) {
-    if (max === 0) return "#ffffff";
-    const t = value / max;
-    return `rgb(255, ${Math.round(255 * (1 - t))}, ${Math.round(255 * (1 - t))})`;
+/* ----------------------------
+   TABLE + SPARKLINE RENDERING
+----------------------------- */
+
+function renderPerLineTable() {
+    const entries = Object.entries(lastPerLineCounts).map(
+        ([line, count]) => ({ line: Number(line), count })
+    );
+
+    entries.sort((a, b) => {
+        const key = currentSort.column;
+        const dir = currentSort.asc ? 1 : -1;
+        return (a[key] - b[key]) * dir;
+    });
+
+    const max = Math.max(...entries.map(e => e.count), 1);
+
+    const rows = entries.map(e => `
+        <tr>
+            <td>${e.line}</td>
+            <td>${e.count}</td>
+        </tr>
+    `).join("");
+
+    const sparkBars = entries.map(e => {
+        const h = Math.round((e.count / max) * 40);
+        return `<div class="spark-bar" style="height:${h}px"></div>`;
+    }).join("");
+
+    return `
+        <h3>Hiatus per Line</h3>
+
+        <table border="1" cellpadding="6" cellspacing="0">
+            <thead>
+                <tr>
+                    <th style="cursor:pointer" onclick="sortTable('line')">
+                        Line ${currentSort.column === "line" ? (currentSort.asc ? "▲" : "▼") : ""}
+                    </th>
+                    <th style="cursor:pointer" onclick="sortTable('count')">
+                        # of Hiatus ${currentSort.column === "count" ? (currentSort.asc ? "▲" : "▼") : ""}
+                    </th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+
+        <div class="sparkline">
+            ${sparkBars}
+        </div>
+    `;
+}
+
+function sortTable(column) {
+    if (currentSort.column === column) {
+        currentSort.asc = !currentSort.asc;
+    } else {
+        currentSort.column = column;
+        currentSort.asc = true;
+    }
+    document.getElementById("perLineContainer").innerHTML = renderPerLineTable();
 }
 
 /* ----------------------------
-   CORE DETECTOR RUN
+   CORE DETECTOR
 ----------------------------- */
 
 async function runDetector(text) {
     const pyodide = await pyodideReadyPromise;
 
-    await pyodide.FS.writeFile(
-        "detector.py",
-        await (await fetch("detector.py")).text()
-    );
+    await pyodide.FS.writeFile("detector.py", await (await fetch("detector.py")).text());
     await pyodide.runPythonAsync(`import detector`);
 
     const options = {
@@ -111,7 +165,8 @@ async function runDetector(text) {
     await pyodide.runPythonAsync(`
 from pathlib import Path
 from detector import detect_hiatus_in_text, write_outputs
-text = Path("/app_input.txt").read_text(encoding="utf-8")
+
+text = Path("/app_input.txt").read_text()
 annotated, occ = detect_hiatus_in_text(text)
 write_outputs(annotated, occ, Path("/out.html"), Path("/out.csv"))
     `);
@@ -123,26 +178,12 @@ write_outputs(annotated, occ, Path("/out.html"), Path("/out.csv"))
 }
 
 /* ----------------------------
-   FILE DOWNLOADS
------------------------------ */
-
-function downloadFile(filename, content, mime) {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-/* ----------------------------
-   RUN BUTTON HANDLER
+   RUN HANDLER
 ----------------------------- */
 
 document.getElementById("runBtn").onclick = async () => {
     const input = document.getElementById("fileInput").files[0];
-    if (!input) return alert("Please select a .txt file first.");
+    if (!input) return alert("Please select a .txt file.");
 
     const status = document.getElementById("status");
     const output = document.getElementById("output");
@@ -152,50 +193,15 @@ document.getElementById("runBtn").onclick = async () => {
 
     try {
         const text = await input.text();
-        const lineCount = text.split(/\r?\n/).filter(l => l.trim()).length;
-        const result = await runDetector(text);
+        lastLineCount = text.split(/\r?\n/).filter(l => l.trim()).length;
 
+        const result = await runDetector(text);
         lastHtmlOutput = result.html;
-        lastCsvOutput  = result.csv;
+        lastCsvOutput = result.csv;
 
         const counts = countHiatusFromCsv(result.csv);
-        const hiatusPerLine = lineCount
-            ? (counts.total / lineCount).toFixed(3)
-            : "0.000";
+        lastPerLineCounts = countHiatusPerLine(result.csv, lastLineCount);
 
-        let perLineSection = "";
-        lastPerLineCsv = null;
-
-        if (document.getElementById("showPerLineTable").checked) {
-            const perLine = countHiatusPerLine(result.csv, lineCount);
-            const max = Math.max(...Object.values(perLine));
-
-            let rows = "";
-            let csvRows = ["line,hiatus_count"];
-
-            for (let i = 1; i <= lineCount; i++) {
-                const c = perLine[i];
-                rows += `
-                    <tr style="background:${heatColor(c, max)}">
-                        <td>${i}</td><td>${c}</td>
-                    </tr>`;
-                csvRows.push(`${i},${c}`);
-            }
-
-            lastPerLineCsv = csvRows.join("\n");
-
-            perLineSection = `
-                <h3>Hiatus per Line</h3>
-                <table border="1" cellpadding="6">
-                    <tr><th>Line</th><th>#</th></tr>
-                    ${rows}
-                </table>`;
-        }
-
-        document.getElementById("downloadPerLineCsvBtn").disabled =
-            !lastPerLineCsv;
-
-        status.textContent = "Done!";
         output.innerHTML = `
             <h3>Hiatus Counts</h3>
             <ul>
@@ -203,39 +209,22 @@ document.getElementById("runBtn").onclick = async () => {
                 <li>B: ${counts.B}</li>
                 <li>V: ${counts.V}</li>
                 <li><strong>Total: ${counts.total}</strong></li>
-                <li>Hiatus / line: ${hiatusPerLine}</li>
             </ul>
-            ${perLineSection}
-            <h3>Annotated HTML</h3>
+
+            <div id="perLineContainer">
+                ${renderPerLineTable()}
+            </div>
+
+            <h3>Annotated Output</h3>
             <div>${result.html}</div>
-            <h3>CSV Output</h3>
-            <pre>${result.csv}</pre>
         `;
 
+        status.textContent = "Done!";
         document.getElementById("downloadHtmlBtn").disabled = false;
         document.getElementById("downloadCsvBtn").disabled = false;
 
     } catch (err) {
-        status.textContent = "Error running detector.";
+        status.textContent = "Error.";
         console.error(err);
     }
-};
-
-/* ----------------------------
-   DOWNLOAD BUTTONS
------------------------------ */
-
-document.getElementById("downloadHtmlBtn").onclick = () => {
-    if (lastHtmlOutput)
-        downloadFile("hiatus_output.html", lastHtmlOutput, "text/html");
-};
-
-document.getElementById("downloadCsvBtn").onclick = () => {
-    if (lastCsvOutput)
-        downloadFile("hiatus_output.csv", lastCsvOutput, "text/csv");
-};
-
-document.getElementById("downloadPerLineCsvBtn").onclick = () => {
-    if (lastPerLineCsv)
-        downloadFile("hiatus_per_line.csv", lastPerLineCsv, "text/csv");
 };
