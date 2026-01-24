@@ -203,7 +203,7 @@ document.getElementById("runBtn").onclick = async () => {
                 <li>B: ${counts.B}</li>
                 <li>V: ${counts.V}</li>
                 <li><strong>Total: ${counts.total}</strong></li>
-                <li>Hiatus / line: ${hiatusPerLine}</li>
+                <li># of hiatus instances per line: ${hiatusPerLine}</li>
             </ul>
             ${perLineSection}
             <h3>Annotated HTML</h3>
