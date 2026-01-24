@@ -60,35 +60,49 @@ function countHiatusFromCsv(csvText) {
    CSV → PER-LINE HIATUS TABLE
 ----------------------------- */
 
-function countHiatusPerLine(csvText) {
-    const lines = csvText.trim().split("\n");
-    lines.shift(); // remove header
-
+function countHiatusPerLine(csvText, lineCount) {
     const perLine = {};
 
-    for (const line of lines) {
-        if (!line.trim()) continue;
-        const cols = line.split(",");
+    // initialize all lines to 0
+    for (let i = 1; i <= lineCount; i++) {
+        perLine[i] = 0;
+    }
 
-        const lineField = cols[2]; // <-- THIS is the line column
+    const rows = csvText.trim().split("\n");
+    rows.shift(); // header
+
+    for (const row of rows) {
+        if (!row.trim()) continue;
+        const cols = row.split(",");
+        const lineField = cols[2]; // "line" column
 
         if (!lineField) continue;
 
-        // across-line hiatus like "7-8"
         if (lineField.includes("-")) {
-            const [a, b] = lineField.split("-").map(n => parseInt(n, 10));
-            if (!isNaN(a)) perLine[a] = (perLine[a] || 0) + 1;
-            if (!isNaN(b)) perLine[b] = (perLine[b] || 0) + 1;
+            const [a, b] = lineField.split("-").map(Number);
+            if (perLine[a] !== undefined) perLine[a]++;
+            if (perLine[b] !== undefined) perLine[b]++;
         } else {
             const n = parseInt(lineField, 10);
-            if (!isNaN(n)) {
-                perLine[n] = (perLine[n] || 0) + 1;
-            }
+            if (perLine[n] !== undefined) perLine[n]++;
         }
     }
 
     return perLine;
 }
+
+
+function heatColor(value, max) {
+    if (max === 0) return "#ffffff";
+
+    const intensity = value / max; // 0 → 1
+    const red = 255;
+    const green = Math.round(255 * (1 - intensity));
+    const blue = Math.round(255 * (1 - intensity));
+
+    return `rgb(${red}, ${green}, ${blue})`;
+}
+
 
 function renderHiatusTable(perLineCounts) {
     const lineNumbers = Object.keys(perLineCounts)
@@ -214,49 +228,79 @@ document.getElementById("runBtn").onclick = async () => {
     output.innerHTML = "";
 
     try {
-        const text = await input.text();
-        const lineCount = text.split(/\r?\n/).filter(l => l.trim() !== "").length;
-        const result = await runDetector(text);
+    const text = await input.text();
+    const lineCount = text.split(/\r?\n/).filter(l => l.trim() !== "").length;
+    const result = await runDetector(text);
 
-        // store for downloads
-        lastHtmlOutput = result.html;
-        lastCsvOutput  = result.csv;
+    // store for downloads
+    lastHtmlOutput = result.html;
+    lastCsvOutput  = result.csv;
 
-        const counts = countHiatusFromCsv(result.csv);
-        const perLineCounts = countHiatusPerLine(result.csv);
-        const hiatusPerLine = lineCount > 0
-            ? (counts.total / lineCount).toFixed(3)
-            : "0.000";
+    const counts = countHiatusFromCsv(result.csv);
 
-        status.textContent = "Done!";
+    // IMPORTANT: pass lineCount here
+    const perLineCounts = countHiatusPerLine(result.csv, lineCount);
 
-        output.innerHTML = `
-            <h3>Hiatus Counts</h3>
-            <ul>
-                <li>Intra-word (I): ${counts.I}</li>
-                <li>Inter-word (B): ${counts.B}</li>
-                <li>Across-line (V): ${counts.V}</li>
-                <li><strong>Total: ${counts.total}</strong></li>
-                <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
-            </ul>
+    const hiatusPerLine = lineCount > 0
+        ? (counts.total / lineCount).toFixed(3)
+        : "0.000";
 
-            <h3>Annotated HTML Output</h3>
-            <div>${result.html}</div>
+    // heatmap max
+    const maxPerLine = Math.max(...Object.values(perLineCounts));
 
-            <h3>CSV Output</h3>
-            <pre>${result.csv}</pre>
+    // build heatmap table rows
+    let tableRows = "";
+    for (let i = 1; i <= lineCount; i++) {
+        const c = perLineCounts[i];
+        const bg = heatColor(c, maxPerLine);
 
-            <h3>Hiatus per Line</h3>
-            ${renderHiatusTable(perLineCounts)}
+        tableRows += `
+            <tr style="background-color: ${bg}">
+                <td>${i}</td>
+                <td>${c}</td>
+            </tr>
         `;
-
-        document.getElementById("downloadHtmlBtn").disabled = false;
-        document.getElementById("downloadCsvBtn").disabled = false;
-
-    } catch (err) {
-        status.textContent = "Error running detector.";
-        console.error(err);
     }
+
+    status.textContent = "Done!";
+
+    output.innerHTML = `
+        <h3>Hiatus Counts</h3>
+        <ul>
+            <li>Intra-word (I): ${counts.I}</li>
+            <li>Inter-word (B): ${counts.B}</li>
+            <li>Across-line (V): ${counts.V}</li>
+            <li><strong>Total: ${counts.total}</strong></li>
+            <li><em>Hiatus per line:</em> ${hiatusPerLine}</li>
+        </ul>
+
+        <h3>Hiatus per Line</h3>
+        <table border="1" cellpadding="6" cellspacing="0">
+            <thead>
+                <tr>
+                    <th>Line</th>
+                    <th># of Hiatus</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+
+        <h3>Annotated HTML Output</h3>
+        <div>${result.html}</div>
+
+        <h3>CSV Output</h3>
+        <pre>${result.csv}</pre>
+    `;
+
+    document.getElementById("downloadHtmlBtn").disabled = false;
+    document.getElementById("downloadCsvBtn").disabled = false;
+
+   } catch (err) {
+       status.textContent = "Error running detector.";
+       console.error(err);
+   }
 };
 
 /* ----------------------------
