@@ -69,10 +69,21 @@ function countHiatusPerLine(csvText) {
     for (const line of lines) {
         if (!line.trim()) continue;
         const cols = line.split(",");
-        const lineNumber = parseInt(cols[0], 10); // assumes first column = line number
 
-        if (!isNaN(lineNumber)) {
-            perLine[lineNumber] = (perLine[lineNumber] || 0) + 1;
+        const lineField = cols[2]; // <-- THIS is the line column
+
+        if (!lineField) continue;
+
+        // across-line hiatus like "7-8"
+        if (lineField.includes("-")) {
+            const [a, b] = lineField.split("-").map(n => parseInt(n, 10));
+            if (!isNaN(a)) perLine[a] = (perLine[a] || 0) + 1;
+            if (!isNaN(b)) perLine[b] = (perLine[b] || 0) + 1;
+        } else {
+            const n = parseInt(lineField, 10);
+            if (!isNaN(n)) {
+                perLine[n] = (perLine[n] || 0) + 1;
+            }
         }
     }
 
