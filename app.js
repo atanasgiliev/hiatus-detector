@@ -92,17 +92,21 @@ function renderSparklineFromData(data, opts = {}) {
     if (!data || data.length === 0) return "";
 
     const {
-        width = 700,
-        height = 120,
-        margin = { top: 10, right: 20, bottom: 30, left: 40 },
+        width = 720,
+        height = 160,
+        margin = { top: 10, right: 20, bottom: 35, left: 45 },
         maxPoints = 300
     } = opts;
 
+    const rawValues = data.map(d => d.count);
+    const trueMaxY = Math.max(...rawValues, 1);
+    const lineCount = data.length;
+
     /* ----------------------------
-       DOWNSAMPLING (BINNING)
+       BINNING (AVERAGE FOR SHAPE)
     ----------------------------- */
 
-    let values = data.map(d => d.count);
+    let values = rawValues.slice();
     let n = values.length;
 
     if (n > maxPoints) {
@@ -119,13 +123,11 @@ function renderSparklineFromData(data, opts = {}) {
         n = values.length;
     }
 
-    const maxY = Math.max(...values, 1);
-
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
     const scaleX = i => margin.left + (i / (n - 1)) * innerW;
-    const scaleY = v => margin.top + innerH - (v / maxY) * innerH;
+    const scaleY = v => margin.top + innerH - (v / trueMaxY) * innerH;
 
     /* ----------------------------
        POLYLINE
@@ -139,53 +141,51 @@ function renderSparklineFromData(data, opts = {}) {
        AXES
     ----------------------------- */
 
-    const xStart = scaleX(0);
-    const xEnd = scaleX(n - 1);
-    const yBottom = margin.top + innerH;
-    const yTop = margin.top;
+    const x0 = scaleX(0);
+    const x1 = scaleX(n - 1);
+    const y0 = margin.top + innerH;
+    const y1 = margin.top;
 
-    const midLine = Math.round(data.length / 2);
-    const lastLine = data.length;
+    /* Y-axis integer ticks */
+    const yTicks = Math.min(trueMaxY, 5);
+    const yStep = Math.ceil(trueMaxY / yTicks);
+
+    /* X-axis ticks (~5) */
+    const xTicks = 5;
+    const xLabels = [];
+    for (let i = 0; i < xTicks; i++) {
+        const frac = i / (xTicks - 1);
+        const lineNum = Math.round(1 + frac * (lineCount - 1));
+        const x = margin.left + frac * innerW;
+        xLabels.push({ x, lineNum });
+    }
 
     return `
         <h4>Hiatus Density per Line</h4>
         <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
 
-            <!-- X axis -->
-            <line x1="${xStart}" y1="${yBottom}" x2="${xEnd}" y2="${yBottom}"
-                  stroke="#000"/>
+            <!-- Axes -->
+            <line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="#000"/>
+            <line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#000"/>
 
-            <!-- Y axis -->
-            <line x1="${xStart}" y1="${yBottom}" x2="${xStart}" y2="${yTop}"
-                  stroke="#000"/>
+            <!-- Y-axis labels -->
+            ${Array.from({ length: yTicks + 1 }, (_, i) => {
+                const v = i * yStep;
+                if (v > trueMaxY) return "";
+                return `
+                    <text x="${x0 - 6}" y="${scaleY(v)}"
+                          text-anchor="end" dominant-baseline="middle"
+                          font-size="10">${v}</text>
+                `;
+            }).join("")}
 
-            <!-- Y labels -->
-            <text x="${xStart - 6}" y="${yBottom}" text-anchor="end"
-                  dominant-baseline="middle" font-size="10">0</text>
-
-            <text x="${xStart - 6}" y="${scaleY(maxY / 2)}" text-anchor="end"
-                  dominant-baseline="middle" font-size="10">
-                ${(maxY / 2).toFixed(1)}
-            </text>
-
-            <text x="${xStart - 6}" y="${scaleY(maxY)}" text-anchor="end"
-                  dominant-baseline="middle" font-size="10">
-                ${maxY}
-            </text>
-
-            <!-- X labels -->
-            <text x="${xStart}" y="${yBottom + 14}" text-anchor="middle"
-                  font-size="10">1</text>
-
-            <text x="${scaleX(Math.floor(n / 2))}" y="${yBottom + 14}"
-                  text-anchor="middle" font-size="10">
-                ~${midLine}
-            </text>
-
-            <text x="${xEnd}" y="${yBottom + 14}" text-anchor="middle"
-                  font-size="10">
-                ${lastLine}
-            </text>
+            <!-- X-axis labels -->
+            ${xLabels.map(l => `
+                <text x="${l.x}" y="${y0 + 16}"
+                      text-anchor="middle" font-size="10">
+                    ${l.lineNum}
+                </text>
+            `).join("")}
 
             <!-- Sparkline -->
             <polyline
@@ -197,7 +197,6 @@ function renderSparklineFromData(data, opts = {}) {
         </svg>
     `;
 }
-
 
 function renderPerLineTable() {
     if (!lastPerLineData) return "";
