@@ -115,8 +115,8 @@ function renderSparklineFromData(data, opts = {}) {
 
         for (let i = 0; i < n; i += binSize) {
             const slice = values.slice(i, i + binSize);
-            const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
-            binned.push(avg);
+            const maxVal = Math.max(...slice);
+            binned.push(maxVal);
         }
 
         values = binned;
