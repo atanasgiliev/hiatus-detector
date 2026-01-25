@@ -88,6 +88,41 @@ function heatColor(value, max) {
    SORTABLE PER-LINE TABLE
 ----------------------------- */
 
+function renderSparklineFromData(data, width = 600, height = 80) {
+    if (!data || data.length === 0) return "";
+
+    const values = data.map(d => d.count);
+    const max = Math.max(...values, 1);
+    const n = values.length;
+
+    if (n < 2) return "";
+
+    const stepX = width / (n - 1);
+
+    const points = values.map((v, i) => {
+        const x = i * stepX;
+        const y = height - (v / max) * height;
+        return `${x},${y}`;
+    }).join(" ");
+
+    return `
+        <svg
+            width="${width}"
+            height="${height}"
+            viewBox="0 0 ${width} ${height}"
+            style="display:block; margin:10px 0;"
+        >
+            <polyline
+                fill="none"
+                stroke="#444"
+                stroke-width="2"
+                points="${points}"
+            />
+        </svg>
+    `;
+}
+
+
 function renderPerLineTable() {
     if (!lastPerLineData) return "";
 
