@@ -110,6 +110,8 @@ function renderPerLineTable() {
     const arrow = c =>
         perLineSort.col === c ? (perLineSort.asc ? " ▲" : " ▼") : "";
 
+   const sparkline = renderSparklineFromData(lastPerLineData);
+
     return `
         <h3>Hiatus per Line</h3>
         <table border="1" cellpadding="6">
@@ -123,7 +125,9 @@ function renderPerLineTable() {
             </tr>
             ${rows}
         </table>
+        ${sparkline}
     `;
+
 }
 
 function sortPerLine(col) {
@@ -136,6 +140,8 @@ function sortPerLine(col) {
     document.getElementById("perLineContainer").innerHTML =
         renderPerLineTable();
 }
+
+
 
 /* ----------------------------
    CORE DETECTOR RUN
