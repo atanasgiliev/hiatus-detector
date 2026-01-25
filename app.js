@@ -4,6 +4,10 @@ let pyodideReadyPromise = loadPyodide();
 let lastHtmlOutput = null;
 let lastCsvOutput = null;
 let lastPerLineCsv = null;
+let lastPerLineData = null;
+
+// sorting state
+let perLineSort = { col: "line", asc: true };
 
 /* ----------------------------
    RUN BUTTON ENABLE / DISABLE
@@ -21,10 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateRunButtonState();
 
     ["detectIntra", "detectInter", "detectAcross"].forEach(id => {
-        document.getElementById(id).addEventListener(
-            "change",
-            updateRunButtonState
-        );
+        document.getElementById(id).addEventListener("change", updateRunButtonState);
     });
 });
 
@@ -84,6 +85,59 @@ function heatColor(value, max) {
 }
 
 /* ----------------------------
+   SORTABLE PER-LINE TABLE
+----------------------------- */
+
+function renderPerLineTable() {
+    if (!lastPerLineData) return "";
+
+    const data = [...lastPerLineData];
+    const max = Math.max(...data.map(d => d.count));
+
+    data.sort((a, b) => {
+        const key = perLineSort.col;
+        const dir = perLineSort.asc ? 1 : -1;
+        return (a[key] - b[key]) * dir;
+    });
+
+    let rows = data.map(d => `
+        <tr style="background:${heatColor(d.count, max)}">
+            <td>${d.line}</td>
+            <td>${d.count}</td>
+        </tr>
+    `).join("");
+
+    const arrow = c =>
+        perLineSort.col === c ? (perLineSort.asc ? " ▲" : " ▼") : "";
+
+    return `
+        <h3>Hiatus per Line</h3>
+        <table border="1" cellpadding="6">
+            <tr>
+                <th style="cursor:pointer" onclick="sortPerLine('line')">
+                    Line${arrow("line")}
+                </th>
+                <th style="cursor:pointer" onclick="sortPerLine('count')">
+                    #${arrow("count")}
+                </th>
+            </tr>
+            ${rows}
+        </table>
+    `;
+}
+
+function sortPerLine(col) {
+    if (perLineSort.col === col) {
+        perLineSort.asc = !perLineSort.asc;
+    } else {
+        perLineSort.col = col;
+        perLineSort.asc = true;
+    }
+    document.getElementById("perLineContainer").innerHTML =
+        renderPerLineTable();
+}
+
+/* ----------------------------
    CORE DETECTOR RUN
 ----------------------------- */
 
@@ -123,20 +177,6 @@ write_outputs(annotated, occ, Path("/out.html"), Path("/out.csv"))
 }
 
 /* ----------------------------
-   FILE DOWNLOADS
------------------------------ */
-
-function downloadFile(filename, content, mime) {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-/* ----------------------------
    RUN BUTTON HANDLER
 ----------------------------- */
 
@@ -165,31 +205,24 @@ document.getElementById("runBtn").onclick = async () => {
 
         let perLineSection = "";
         lastPerLineCsv = null;
+        lastPerLineData = null;
 
         if (document.getElementById("showPerLineTable").checked) {
             const perLine = countHiatusPerLine(result.csv, lineCount);
-            const max = Math.max(...Object.values(perLine));
+            const csvRows = ["line,hiatus_count"];
 
-            let rows = "";
-            let csvRows = ["line,hiatus_count"];
+            lastPerLineData = [];
 
             for (let i = 1; i <= lineCount; i++) {
-                const c = perLine[i];
-                rows += `
-                    <tr style="background:${heatColor(c, max)}">
-                        <td>${i}</td><td>${c}</td>
-                    </tr>`;
-                csvRows.push(`${i},${c}`);
+                lastPerLineData.push({ line: i, count: perLine[i] });
+                csvRows.push(`${i},${perLine[i]}`);
             }
 
             lastPerLineCsv = csvRows.join("\n");
 
-            perLineSection = `
-                <h3>Hiatus per Line</h3>
-                <table border="1" cellpadding="6">
-                    <tr><th>Line</th><th>#</th></tr>
-                    ${rows}
-                </table>`;
+            perLineSection = `<div id="perLineContainer">
+                ${renderPerLineTable()}
+            </div>`;
         }
 
         document.getElementById("downloadPerLineCsvBtn").disabled =
