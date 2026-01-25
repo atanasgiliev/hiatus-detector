@@ -88,52 +88,36 @@ function heatColor(value, max) {
    SORTABLE PER-LINE TABLE
 ----------------------------- */
 
-function renderSparklineFromData(data, opts = {}) {
+function renderSparklineFromData(data) {
     if (!data || data.length === 0) return "";
 
-    const {
-        width = 720,
-        height = 160,
-        margin = { top: 10, right: 20, bottom: 35, left: 45 },
-        maxPoints = 300
-    } = opts;
+    const width = 1000;   // logical width (stretched via viewBox)
+    const height = 220;
+    const margin = { top: 15, right: 20, bottom: 40, left: 45 };
 
-    const rawValues = data.map(d => d.count);
-    const trueMaxY = Math.max(...rawValues, 1);
-    const lineCount = data.length;
+    const counts = data.map(d => d.count);
+    const lineCount = counts.length;
 
-    /* ----------------------------
-       BINNING (AVERAGE FOR SHAPE)
-    ----------------------------- */
-
-    let values = rawValues.slice();
-    let n = values.length;
-
-    if (n > maxPoints) {
-        const binSize = Math.ceil(n / maxPoints);
-        const binned = [];
-
-        for (let i = 0; i < n; i += binSize) {
-            const slice = values.slice(i, i + binSize);
-            const maxVal = Math.max(...slice);
-            binned.push(maxVal);
-        }
-
-        values = binned;
-        n = values.length;
-    }
+    const yMax = Math.max(...counts, 1); // force ≥1 so scale exists
 
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
-    const scaleX = i => margin.left + (i / (n - 1)) * innerW;
-    const scaleY = v => margin.top + innerH - (v / trueMaxY) * innerH;
-
     /* ----------------------------
-       POLYLINE
+       SCALES (NO BINNING)
     ----------------------------- */
 
-    const points = values
+    const scaleX = i =>
+        margin.left + (i / (lineCount - 1)) * innerW;
+
+    const scaleY = v =>
+        margin.top + innerH - (v / yMax) * innerH;
+
+    /* ----------------------------
+       SPARKLINE POINTS
+    ----------------------------- */
+
+    const points = counts
         .map((v, i) => `${scaleX(i)},${scaleY(v)}`)
         .join(" ");
 
@@ -141,62 +125,77 @@ function renderSparklineFromData(data, opts = {}) {
        AXES
     ----------------------------- */
 
-    const x0 = scaleX(0);
-    const x1 = scaleX(n - 1);
+    const x0 = margin.left;
+    const x1 = margin.left + innerW;
     const y0 = margin.top + innerH;
     const y1 = margin.top;
 
-    /* Y-axis integer ticks */
-    const yTicks = Math.min(trueMaxY, 5);
-    const yStep = Math.ceil(trueMaxY / yTicks);
+    /* Y-axis: integers only */
+    const yTicks = Math.min(yMax, 6);
+    const yStep = Math.max(1, Math.ceil(yMax / yTicks));
 
-    /* X-axis ticks (~5) */
-    const xTicks = 5;
+    /* X-axis: adaptive ticks */
+    let xStep =
+        lineCount <= 200 ? 25 :
+        lineCount <= 500 ? 50 :
+        100;
+
     const xLabels = [];
-    for (let i = 0; i < xTicks; i++) {
-        const frac = i / (xTicks - 1);
-        const lineNum = Math.round(1 + frac * (lineCount - 1));
-        const x = margin.left + frac * innerW;
-        xLabels.push({ x, lineNum });
+    for (let i = 1; i <= lineCount; i += xStep) {
+        const frac = (i - 1) / (lineCount - 1);
+        xLabels.push({
+            x: margin.left + frac * innerW,
+            label: i
+        });
+    }
+
+    // always include last line
+    if (xLabels.at(-1)?.label !== lineCount) {
+        xLabels.push({
+            x: margin.left + innerW,
+            label: lineCount
+        });
     }
 
     return `
         <h4>Hiatus Density per Line</h4>
-        <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+
+        <svg viewBox="0 0 ${width} ${height}"
+             style="width:100%; height:${height}px; display:block">
 
             <!-- Axes -->
             <line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="#000"/>
             <line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#000"/>
 
             <!-- Y-axis labels -->
-            ${Array.from({ length: yTicks + 1 }, (_, i) => {
+            ${Array.from({ length: Math.floor(yMax / yStep) + 1 }, (_, i) => {
                 const v = i * yStep;
-                if (v > trueMaxY) return "";
                 return `
                     <text x="${x0 - 6}" y="${scaleY(v)}"
-                          text-anchor="end" dominant-baseline="middle"
+                          text-anchor="end"
+                          dominant-baseline="middle"
                           font-size="10">${v}</text>
                 `;
             }).join("")}
 
             <!-- X-axis labels -->
             ${xLabels.map(l => `
-                <text x="${l.x}" y="${y0 + 16}"
-                      text-anchor="middle" font-size="10">
-                    ${l.lineNum}
-                </text>
+                <text x="${l.x}" y="${y0 + 18}"
+                      text-anchor="middle"
+                      font-size="10">${l.label}</text>
             `).join("")}
 
             <!-- Sparkline -->
             <polyline
                 fill="none"
                 stroke="#444"
-                stroke-width="2"
+                stroke-width="1"
                 points="${points}"
             />
         </svg>
     `;
 }
+
 
 function renderPerLineTable() {
     if (!lastPerLineData) return "";
@@ -223,8 +222,12 @@ function renderPerLineTable() {
    const sparkline = renderSparklineFromData(lastPerLineData);
 
     return `
-        <h3>Hiatus per Line</h3>
-        <table border="1" cellpadding="6">
+    <details ${lastPerLineData.length > 50 ? "" : "open"}>
+        <summary style="cursor:pointer; font-weight:600;">
+            Hiatus per Line (click to expand)
+        </summary>
+
+        <table border="1" cellpadding="6" style="margin-top:8px;">
             <tr>
                 <th style="cursor:pointer" onclick="sortPerLine('line')">
                     Line${arrow("line")}
@@ -235,8 +238,11 @@ function renderPerLineTable() {
             </tr>
             ${rows}
         </table>
-        ${sparkline}
-    `;
+    </details>
+
+    ${renderSparklineFromData(lastPerLineData)}
+`;
+
 
 }
 
