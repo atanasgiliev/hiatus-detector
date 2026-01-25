@@ -88,30 +88,106 @@ function heatColor(value, max) {
    SORTABLE PER-LINE TABLE
 ----------------------------- */
 
-function renderSparklineFromData(data, width = 600, height = 80) {
+function renderSparklineFromData(data, opts = {}) {
     if (!data || data.length === 0) return "";
 
-    const values = data.map(d => d.count);
-    const max = Math.max(...values, 1);
-    const n = values.length;
+    const {
+        width = 700,
+        height = 120,
+        margin = { top: 10, right: 20, bottom: 30, left: 40 },
+        maxPoints = 300
+    } = opts;
 
-    if (n < 2) return "";
+    /* ----------------------------
+       DOWNSAMPLING (BINNING)
+    ----------------------------- */
 
-    const stepX = width / (n - 1);
+    let values = data.map(d => d.count);
+    let n = values.length;
 
-    const points = values.map((v, i) => {
-        const x = i * stepX;
-        const y = height - (v / max) * height;
-        return `${x},${y}`;
-    }).join(" ");
+    if (n > maxPoints) {
+        const binSize = Math.ceil(n / maxPoints);
+        const binned = [];
+
+        for (let i = 0; i < n; i += binSize) {
+            const slice = values.slice(i, i + binSize);
+            const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
+            binned.push(avg);
+        }
+
+        values = binned;
+        n = values.length;
+    }
+
+    const maxY = Math.max(...values, 1);
+
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
+
+    const scaleX = i => margin.left + (i / (n - 1)) * innerW;
+    const scaleY = v => margin.top + innerH - (v / maxY) * innerH;
+
+    /* ----------------------------
+       POLYLINE
+    ----------------------------- */
+
+    const points = values
+        .map((v, i) => `${scaleX(i)},${scaleY(v)}`)
+        .join(" ");
+
+    /* ----------------------------
+       AXES
+    ----------------------------- */
+
+    const xStart = scaleX(0);
+    const xEnd = scaleX(n - 1);
+    const yBottom = margin.top + innerH;
+    const yTop = margin.top;
+
+    const midLine = Math.round(data.length / 2);
+    const lastLine = data.length;
 
     return `
-        <svg
-            width="${width}"
-            height="${height}"
-            viewBox="0 0 ${width} ${height}"
-            style="display:block; margin:10px 0;"
-        >
+        <h4>Hiatus Density per Line</h4>
+        <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+
+            <!-- X axis -->
+            <line x1="${xStart}" y1="${yBottom}" x2="${xEnd}" y2="${yBottom}"
+                  stroke="#000"/>
+
+            <!-- Y axis -->
+            <line x1="${xStart}" y1="${yBottom}" x2="${xStart}" y2="${yTop}"
+                  stroke="#000"/>
+
+            <!-- Y labels -->
+            <text x="${xStart - 6}" y="${yBottom}" text-anchor="end"
+                  dominant-baseline="middle" font-size="10">0</text>
+
+            <text x="${xStart - 6}" y="${scaleY(maxY / 2)}" text-anchor="end"
+                  dominant-baseline="middle" font-size="10">
+                ${(maxY / 2).toFixed(1)}
+            </text>
+
+            <text x="${xStart - 6}" y="${scaleY(maxY)}" text-anchor="end"
+                  dominant-baseline="middle" font-size="10">
+                ${maxY}
+            </text>
+
+            <!-- X labels -->
+            <text x="${xStart}" y="${yBottom + 14}" text-anchor="middle"
+                  font-size="10">1</text>
+
+            <text x="${scaleX(Math.floor(n / 2))}" y="${yBottom + 14}"
+                  text-anchor="middle" font-size="10">
+                ~${midLine}
+            </text>
+
+            <text x="${xEnd}" y="${yBottom + 14}" text-anchor="middle"
+                  font-size="10">
+                ${lastLine}
+            </text>
+
+            <!-- Sparkline -->
             <polyline
                 fill="none"
                 stroke="#444"
