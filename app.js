@@ -244,6 +244,29 @@ function sortPerLine(col) {
         renderPerLineTable(perLineTableOpen);
 }
 
+function addLineNumbersToAnnotatedHtml(html) {
+    const lines = html.split("\n");
+
+    return lines.map((line, i) => `
+        <div style="display:flex;">
+            <div style="
+                width:3em;
+                text-align:right;
+                padding-right:0.75em;
+                color:#666;
+                user-select:none;
+                font-family:monospace;
+            ">
+                ${i + 1}
+            </div>
+            <div style="flex:1;">
+                ${line || "&nbsp;"}
+            </div>
+        </div>
+    `).join("");
+}
+
+
 /* ----------------------------
    CORE DETECTOR RUN
 ----------------------------- */
@@ -365,7 +388,9 @@ document.getElementById("runBtn").onclick = async () => {
             </ul>
             ${perLineSection}
             <h3>Annotated HTML</h3>
-            <div>${result.html}</div>
+            <div style="font-family:serif;">
+               ${addLineNumbersToAnnotatedHtml(result.html)}
+            </div>
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
