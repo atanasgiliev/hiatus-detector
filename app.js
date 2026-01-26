@@ -9,6 +9,9 @@ let lastPerLineData = null;
 // sorting state
 let perLineSort = { col: "line", asc: true };
 
+/* === STEP 1: remember open/closed state of per-line table === */
+let perLineTableOpen = false;
+
 /* ----------------------------
    RUN BUTTON ENABLE / DISABLE
 ----------------------------- */
@@ -91,21 +94,16 @@ function heatColor(value, max) {
 function renderSparklineFromData(data) {
     if (!data || data.length === 0) return "";
 
-    const width = 1000;   // logical width (stretched via viewBox)
+    const width = 1000;
     const height = 220;
     const margin = { top: 15, right: 20, bottom: 40, left: 45 };
 
     const counts = data.map(d => d.count);
     const lineCount = counts.length;
-
-    const yMax = Math.max(...counts, 1); // force ≥1 so scale exists
+    const yMax = Math.max(...counts, 1);
 
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
-
-    /* ----------------------------
-       SCALES (NO BINNING)
-    ----------------------------- */
 
     const scaleX = i =>
         margin.left + (i / (lineCount - 1)) * innerW;
@@ -113,28 +111,18 @@ function renderSparklineFromData(data) {
     const scaleY = v =>
         margin.top + innerH - (v / yMax) * innerH;
 
-    /* ----------------------------
-       SPARKLINE POINTS
-    ----------------------------- */
-
     const points = counts
         .map((v, i) => `${scaleX(i)},${scaleY(v)}`)
         .join(" ");
-
-    /* ----------------------------
-       AXES
-    ----------------------------- */
 
     const x0 = margin.left;
     const x1 = margin.left + innerW;
     const y0 = margin.top + innerH;
     const y1 = margin.top;
 
-    /* Y-axis: integers only */
     const yTicks = Math.min(yMax, 6);
     const yStep = Math.max(1, Math.ceil(yMax / yTicks));
 
-    /* X-axis: adaptive ticks */
     let xStep =
         lineCount <= 200 ? 25 :
         lineCount <= 500 ? 50 :
@@ -149,7 +137,6 @@ function renderSparklineFromData(data) {
         });
     }
 
-    // always include last line
     if (xLabels.at(-1)?.label !== lineCount) {
         xLabels.push({
             x: margin.left + innerW,
@@ -159,15 +146,11 @@ function renderSparklineFromData(data) {
 
     return `
         <h4>Hiatus Density per Line</h4>
-
         <svg viewBox="0 0 ${width} ${height}"
              style="width:100%; height:${height}px; display:block">
-
-            <!-- Axes -->
             <line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="#000"/>
             <line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#000"/>
 
-            <!-- Y-axis labels -->
             ${Array.from({ length: Math.floor(yMax / yStep) + 1 }, (_, i) => {
                 const v = i * yStep;
                 return `
@@ -178,14 +161,12 @@ function renderSparklineFromData(data) {
                 `;
             }).join("")}
 
-            <!-- X-axis labels -->
             ${xLabels.map(l => `
                 <text x="${l.x}" y="${y0 + 18}"
                       text-anchor="middle"
                       font-size="10">${l.label}</text>
             `).join("")}
 
-            <!-- Sparkline -->
             <polyline
                 fill="none"
                 stroke="#444"
@@ -196,8 +177,8 @@ function renderSparklineFromData(data) {
     `;
 }
 
-
-function renderPerLineTable() {
+/* === STEP 3: render table with remembered open/closed state === */
+function renderPerLineTable(forceOpen = null) {
     if (!lastPerLineData) return "";
 
     const data = [...lastPerLineData];
@@ -209,6 +190,11 @@ function renderPerLineTable() {
         return (a[key] - b[key]) * dir;
     });
 
+    const shouldBeOpen =
+        forceOpen !== null
+            ? forceOpen
+            : lastPerLineData.length <= 50;
+
     let rows = data.map(d => `
         <tr style="background:${heatColor(d.count, max)}">
             <td>${d.line}</td>
@@ -219,45 +205,44 @@ function renderPerLineTable() {
     const arrow = c =>
         perLineSort.col === c ? (perLineSort.asc ? " ▲" : " ▼") : "";
 
-   const sparkline = renderSparklineFromData(lastPerLineData);
-
     return `
-    <details ${lastPerLineData.length > 50 ? "" : "open"}>
-        <summary style="cursor:pointer; font-weight:600;">
-            Hiatus per Line (click to expand)
-        </summary>
+        <details ${shouldBeOpen ? "open" : ""}>
+            <summary style="cursor:pointer; font-weight:600;">
+                Hiatus per Line (click to expand)
+            </summary>
 
-        <table border="1" cellpadding="6" style="margin-top:8px;">
-            <tr>
-                <th style="cursor:pointer" onclick="sortPerLine('line')">
-                    Line${arrow("line")}
-                </th>
-                <th style="cursor:pointer" onclick="sortPerLine('count')">
-                    #${arrow("count")}
-                </th>
-            </tr>
-            ${rows}
-        </table>
-    </details>
+            <table border="1" cellpadding="6" style="margin-top:8px;">
+                <tr>
+                    <th style="cursor:pointer" onclick="sortPerLine('line')">
+                        Line${arrow("line")}
+                    </th>
+                    <th style="cursor:pointer" onclick="sortPerLine('count')">
+                        #${arrow("count")}
+                    </th>
+                </tr>
+                ${rows}
+            </table>
+        </details>
 
-    ${renderSparklineFromData(lastPerLineData)}
-`;
-
-
+        ${renderSparklineFromData(lastPerLineData)}
+    `;
 }
 
+/* === STEP 2: capture open/closed state before re-render === */
 function sortPerLine(col) {
+    const details = document.querySelector("#perLineContainer details");
+    perLineTableOpen = details ? details.open : false;
+
     if (perLineSort.col === col) {
         perLineSort.asc = !perLineSort.asc;
     } else {
         perLineSort.col = col;
         perLineSort.asc = true;
     }
+
     document.getElementById("perLineContainer").innerHTML =
-        renderPerLineTable();
+        renderPerLineTable(perLineTableOpen);
 }
-
-
 
 /* ----------------------------
    CORE DETECTOR RUN
@@ -315,7 +300,6 @@ function downloadFile(filename, content, mime) {
 
     URL.revokeObjectURL(url);
 }
-
 
 /* ----------------------------
    RUN BUTTON HANDLER
