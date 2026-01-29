@@ -366,7 +366,7 @@ document.getElementById("runBtn").onclick = async () => {
 
             ${perLineSection}
 
-            <h3>Annotated Text (with Line Numbers)</h3>
+            <h3>TEST Annotated Text (with Line Numbers)</h3>
             <div style="font-family:serif;">
                ${addLineNumbersToAnnotatedHtml(
                   result.html.replace(/^.*?<br\s*\/?>/i, "")
