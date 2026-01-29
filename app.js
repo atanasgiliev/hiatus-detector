@@ -9,6 +9,9 @@ let lastPerLineData = null;
 // sorting state
 let perLineSort = { col: "line", asc: true };
 
+/* === STEP 1: remember open/closed state of per-line table === */
+let perLineTableOpen = false;
+
 /* ----------------------------
    RUN BUTTON ENABLE / DISABLE
 ----------------------------- */
@@ -23,11 +26,10 @@ function updateRunButtonState() {
 
 document.addEventListener("DOMContentLoaded", () => {
     updateRunButtonState();
-    ["detectIntra", "detectInter", "detectAcross"]
-        .forEach(id =>
-            document.getElementById(id)
-                .addEventListener("change", updateRunButtonState)
-        );
+
+    ["detectIntra", "detectInter", "detectAcross"].forEach(id => {
+        document.getElementById(id).addEventListener("change", updateRunButtonState);
+    });
 });
 
 /* ----------------------------
@@ -86,40 +88,7 @@ function heatColor(value, max) {
 }
 
 /* ----------------------------
-   LINE-NUMBERED ANNOTATED HTML
------------------------------ */
-
-function addLineNumbersToAnnotatedHtml(html) {
-    const parts = html.split(/<br\s*\/?>/i);
-
-    let lineNo = 1;
-
-    return parts.map(part => {
-        if (!part.trim()) return part;
-
-        return `
-            <div style="display:flex; align-items:flex-start;">
-                <div style="
-                    width:3em;
-                    text-align:right;
-                    padding-right:0.75em;
-                    color:#666;
-                    user-select:none;
-                    font-family:monospace;
-                    flex-shrink:0;
-                ">
-                    ${lineNo++}
-                </div>
-                <div style="flex:1;">
-                    ${part}
-                </div>
-            </div>
-        `;
-    }).join("");
-}
-
-/* ----------------------------
-   SPARKLINE
+   SORTABLE PER-LINE TABLE
 ----------------------------- */
 
 function renderSparklineFromData(data) {
@@ -151,7 +120,8 @@ function renderSparklineFromData(data) {
     const y0 = margin.top + innerH;
     const y1 = margin.top;
 
-    const yStep = Math.max(1, Math.ceil(yMax / 6));
+    const yTicks = Math.min(yMax, 6);
+    const yStep = Math.max(1, Math.ceil(yMax / yTicks));
 
     let xStep =
         lineCount <= 200 ? 25 :
@@ -166,15 +136,18 @@ function renderSparklineFromData(data) {
             label: i
         });
     }
+
     if (xLabels.at(-1)?.label !== lineCount) {
-        xLabels.push({ x: margin.left + innerW, label: lineCount });
+        xLabels.push({
+            x: margin.left + innerW,
+            label: lineCount
+        });
     }
 
     return `
         <h4>Hiatus Density per Line</h4>
         <svg viewBox="0 0 ${width} ${height}"
              style="width:100%; height:${height}px; display:block">
-
             <line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="#000"/>
             <line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#000"/>
 
@@ -204,11 +177,8 @@ function renderSparklineFromData(data) {
     `;
 }
 
-/* ----------------------------
-   SORTABLE PER-LINE TABLE
------------------------------ */
-
-function renderPerLineTable() {
+/* === STEP 3: render table with remembered open/closed state === */
+function renderPerLineTable(forceOpen = null) {
     if (!lastPerLineData) return "";
 
     const data = [...lastPerLineData];
@@ -220,11 +190,23 @@ function renderPerLineTable() {
         return (a[key] - b[key]) * dir;
     });
 
+    const shouldBeOpen =
+        forceOpen !== null
+            ? forceOpen
+            : lastPerLineData.length <= 50;
+
+    let rows = data.map(d => `
+        <tr style="background:${heatColor(d.count, max)}">
+            <td>${d.line}</td>
+            <td>${d.count}</td>
+        </tr>
+    `).join("");
+
     const arrow = c =>
         perLineSort.col === c ? (perLineSort.asc ? " ▲" : " ▼") : "";
 
     return `
-        <details ${lastPerLineData.length > 50 ? "" : "open"}>
+        <details ${shouldBeOpen ? "open" : ""}>
             <summary style="cursor:pointer; font-weight:600;">
                 Hiatus per Line (click to expand)
             </summary>
@@ -238,12 +220,7 @@ function renderPerLineTable() {
                         #${arrow("count")}
                     </th>
                 </tr>
-                ${data.map(d => `
-                    <tr style="background:${heatColor(d.count, max)}">
-                        <td>${d.line}</td>
-                        <td>${d.count}</td>
-                    </tr>
-                `).join("")}
+                ${rows}
             </table>
         </details>
 
@@ -251,15 +228,20 @@ function renderPerLineTable() {
     `;
 }
 
+/* === STEP 2: capture open/closed state before re-render === */
 function sortPerLine(col) {
+    const details = document.querySelector("#perLineContainer details");
+    perLineTableOpen = details ? details.open : false;
+
     if (perLineSort.col === col) {
         perLineSort.asc = !perLineSort.asc;
     } else {
         perLineSort.col = col;
         perLineSort.asc = true;
     }
+
     document.getElementById("perLineContainer").innerHTML =
-        renderPerLineTable();
+        renderPerLineTable(perLineTableOpen);
 }
 
 /* ----------------------------
@@ -302,6 +284,24 @@ write_outputs(annotated, occ, Path("/out.html"), Path("/out.csv"))
 }
 
 /* ----------------------------
+   FILE DOWNLOADS
+----------------------------- */
+
+function downloadFile(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+}
+
+/* ----------------------------
    RUN BUTTON HANDLER
 ----------------------------- */
 
@@ -334,20 +334,20 @@ document.getElementById("runBtn").onclick = async () => {
 
         if (document.getElementById("showPerLineTable").checked) {
             const perLine = countHiatusPerLine(result.csv, lineCount);
-            lastPerLineData = [];
             const csvRows = ["line,hiatus_count"];
+
+            lastPerLineData = [];
 
             for (let i = 1; i <= lineCount; i++) {
                 lastPerLineData.push({ line: i, count: perLine[i] });
                 csvRows.push(`${i},${perLine[i]}`);
             }
+
             lastPerLineCsv = csvRows.join("\n");
 
-            perLineSection = `
-                <div id="perLineContainer">
-                    ${renderPerLineTable()}
-                </div>
-            `;
+            perLineSection = `<div id="perLineContainer">
+                ${renderPerLineTable()}
+            </div>`;
         }
 
         document.getElementById("downloadPerLineCsvBtn").disabled =
@@ -363,16 +363,11 @@ document.getElementById("runBtn").onclick = async () => {
                 <li><strong>Total: ${counts.total}</strong></li>
                 <li># of hiatus instances per line: ${hiatusPerLine}</li>
             </ul>
-
             ${perLineSection}
-
-            <h3>TEST Annotated Text (with Line Numbers)</h3>
-            <div style="font-family:serif;">
-               ${addLineNumbersToAnnotatedHtml(
-                  result.html.replace(/^.*?<br\s*\/?>/i, "")
-               )}
-            </div>
-
+            <h3>Annotated HTML</h3>
+            <div>${result.html}</div>
+            <h3>CSV Output</h3>
+            <pre>${result.csv}</pre>
         `;
 
         document.getElementById("downloadHtmlBtn").disabled = false;
@@ -387,19 +382,6 @@ document.getElementById("runBtn").onclick = async () => {
 /* ----------------------------
    DOWNLOAD BUTTONS
 ----------------------------- */
-
-function downloadFile(filename, content, mime) {
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
 
 document.getElementById("downloadHtmlBtn").onclick = () => {
     if (lastHtmlOutput)
