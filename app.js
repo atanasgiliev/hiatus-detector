@@ -87,6 +87,23 @@ function heatColor(value, max) {
     return `rgb(255, ${Math.round(255 * (1 - t))}, ${Math.round(255 * (1 - t))})`;
 }
 
+function addLineNumbersToAnnotatedHTML(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+
+    const pre = doc.querySelector("pre.source");
+    if (!pre) return html; // fail safely
+
+    const lines = pre.innerHTML.split("\n");
+
+    pre.innerHTML = lines
+        .map(line => `<span class="line">${line || "&nbsp;"}</span>`)
+        .join("\n");
+
+    return doc.body.innerHTML;
+}
+
+
 /* ----------------------------
    SORTABLE PER-LINE TABLE
 ----------------------------- */
@@ -365,7 +382,7 @@ document.getElementById("runBtn").onclick = async () => {
             </ul>
             ${perLineSection}
             <h3>Annotated HTML</h3>
-            <div>${result.html}</div>
+            <div>${addLineNumbersToAnnotatedHTML(result.html)}</div>
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
