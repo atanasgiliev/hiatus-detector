@@ -90,26 +90,32 @@ function heatColor(value, max) {
 ----------------------------- */
 
 function addLineNumbersToAnnotatedHtml(html) {
-    const lines = html.split(/<br\s*\/?>/i);
+    const parts = html.split(/<br\s*\/?>/i);
 
-    return lines.map((line, i) => `
-        <div style="display:flex; align-items:flex-start;">
-            <div style="
-                width:3em;
-                text-align:right;
-                padding-right:0.75em;
-                color:#666;
-                user-select:none;
-                font-family:monospace;
-                flex-shrink:0;
-            ">
-                ${i + 1}
+    let lineNo = 1;
+
+    return parts.map(part => {
+        if (!part.trim()) return part;
+
+        return `
+            <div style="display:flex; align-items:flex-start;">
+                <div style="
+                    width:3em;
+                    text-align:right;
+                    padding-right:0.75em;
+                    color:#666;
+                    user-select:none;
+                    font-family:monospace;
+                    flex-shrink:0;
+                ">
+                    ${lineNo++}
+                </div>
+                <div style="flex:1;">
+                    ${part}
+                </div>
             </div>
-            <div style="flex:1;">
-                ${line || "&nbsp;"}
-            </div>
-        </div>
-    `).join("");
+        `;
+    }).join("");
 }
 
 /* ----------------------------
@@ -362,8 +368,11 @@ document.getElementById("runBtn").onclick = async () => {
 
             <h3>Annotated Text (with Line Numbers)</h3>
             <div style="font-family:serif;">
-                ${addLineNumbersToAnnotatedHtml(result.html)}
+               ${addLineNumbersToAnnotatedHtml(
+                  result.html.replace(/^.*?<br\s*\/?>/i, "")
+               )}
             </div>
+
         `;
 
         document.getElementById("downloadHtmlBtn").disabled = false;
