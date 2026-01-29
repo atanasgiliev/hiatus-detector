@@ -384,7 +384,10 @@ document.getElementById("runBtn").onclick = async () => {
             </ul>
             ${perLineSection}
             <h3>Annotated HTML</h3>
-            <div>${result.html}</div>
+            <iframe
+                style="width:100%; height:600px; border:1px solid #ccc;"
+                srcdoc="${addLineNumbersToAnnotatedHTML(result.html).replace(/"/g, '&quot;')}">
+            </iframe>
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
