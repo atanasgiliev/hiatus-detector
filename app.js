@@ -1,4 +1,4 @@
-let pyodideReadyPromise = loadPyodide();
+elet pyodideReadyPromise = loadPyodide();
 
 // store outputs for download buttons
 let lastHtmlOutput = null;
@@ -384,10 +384,7 @@ document.getElementById("runBtn").onclick = async () => {
             </ul>
             ${perLineSection}
             <h3>Annotated HTML</h3>
-            <iframe
-                style="width:100%; height:600px; border:1px solid #ccc;"
-                srcdoc="${addLineNumbersToAnnotatedHTML(result.html).replace(/"/g, '&quot;')}">
-            </iframe>
+            <div>${result.html}</div>
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
