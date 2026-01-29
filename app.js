@@ -92,7 +92,7 @@ function addLineNumbersToAnnotatedHTML(html) {
     const doc = parser.parseFromString(html, "text/html");
 
     const pre = doc.querySelector("pre.source");
-    if (!pre) return html; // fail safely
+    if (!pre) return html;
 
     const lines = pre.innerHTML.split("\n");
 
@@ -100,8 +100,10 @@ function addLineNumbersToAnnotatedHTML(html) {
         .map(line => `<span class="line">${line || "&nbsp;"}</span>`)
         .join("\n");
 
-    return doc.body.innerHTML;
+    // IMPORTANT: return the FULL document, not just body
+    return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
 }
+
 
 
 /* ----------------------------
@@ -382,7 +384,10 @@ document.getElementById("runBtn").onclick = async () => {
             </ul>
             ${perLineSection}
             <h3>Annotated HTML</h3>
-            <div>${addLineNumbersToAnnotatedHTML(result.html)}</div>
+            <iframe
+                style="width:100%; height:600px; border:1px solid #ccc;"
+                srcdoc="${addLineNumbersToAnnotatedHTML(result.html).replace(/"/g, '&quot;')}">
+            </iframe>
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
