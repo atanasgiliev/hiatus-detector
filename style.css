@@ -194,3 +194,29 @@ footer {
         font-size: 1.8rem;
     }
 }
+
+/* ---------- Line Numbers (CSS counters) ---------- */
+
+pre.source {
+    counter-reset: line;
+    padding-left: 3.5em;      /* space for numbers */
+    position: relative;
+}
+
+pre.source .line {
+    display: block;
+    position: relative;
+}
+
+pre.source .line::before {
+    counter-increment: line;
+    content: counter(line);
+    position: absolute;
+    left: -3em;
+    width: 2.5em;
+    text-align: right;
+    color: #999;
+    font-size: 0.85em;
+    user-select: none;
+}
+
