@@ -94,15 +94,40 @@ function addLineNumbersToAnnotatedHTML(html) {
     const pre = doc.querySelector("pre.source");
     if (!pre) return html;
 
+    /* ---------- wrap lines ---------- */
     const lines = pre.innerHTML.split("\n");
-
     pre.innerHTML = lines
         .map(line => `<span class="line">${line || "&nbsp;"}</span>`)
         .join("\n");
 
-    // IMPORTANT: return the FULL document, not just body
+    /* ---------- inject CSS into iframe document ---------- */
+    const style = doc.createElement("style");
+    style.textContent = `
+        pre.source {
+            counter-reset: line;
+        }
+        pre.source .line {
+            display: block;
+            padding-left: 3.5em;
+            position: relative;
+        }
+        pre.source .line::before {
+            counter-increment: line;
+            content: counter(line);
+            position: absolute;
+            left: 0;
+            width: 3em;
+            text-align: right;
+            color: #888;
+            font-family: monospace;
+            user-select: none;
+        }
+    `;
+    doc.head.appendChild(style);
+
     return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
 }
+
 
 
 
@@ -384,7 +409,10 @@ document.getElementById("runBtn").onclick = async () => {
             </ul>
             ${perLineSection}
             <h3>Annotated HTML</h3>
-            <div>${result.html}</div>
+            <iframe
+                style="width:100%; height:600px; border:1px solid #ccc;"
+                srcdoc="${addLineNumbersToAnnotatedHTML(result.html).replace(/"/g, '&quot;')}">
+            </iframe>
             <h3>CSV Output</h3>
             <pre>${result.csv}</pre>
         `;
