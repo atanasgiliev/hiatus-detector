@@ -408,13 +408,10 @@ document.getElementById("runBtn").onclick = async () => {
                 <li># of hiatus instances per line: ${hiatusPerLine}</li>
             </ul>
             ${perLineSection}
-            <h3>Annotated HTML</h3>
             <iframe
                 style="width:100%; height:600px; border:1px solid #ccc;"
                 srcdoc="${addLineNumbersToAnnotatedHTML(result.html).replace(/"/g, '&quot;')}">
             </iframe>
-            <h3>CSV Output</h3>
-            <pre>${result.csv}</pre>
         `;
 
         document.getElementById("downloadHtmlBtn").disabled = false;
