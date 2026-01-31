@@ -25,6 +25,27 @@ BASE_VOWELS = "αεηιουω"
 DASHES = {"—", "–", "-"}
 STRONG_PUNCTUATION = {".", ",", "·", ";", ":"}
 
+
+# ---------------------------
+# NEW: vowel nucleus helper
+# ---------------------------
+def vowel_nucleus(cluster_texts):
+    combined = "".join(cluster_texts)
+    nfd = unicodedata.normalize("NFD", combined)
+
+    if COMBINING_DIAERESIS in nfd:
+        return None
+
+    base = "".join(
+        c for c in nfd
+        if unicodedata.combining(c) == 0 and c.lower() in BASE_VOWELS
+    ).lower()
+
+    if contains_iota_subscript(combined):
+        base += "ι"
+
+    return base or None
+
 # ---------------------------
 # Grapheme cluster helpers
 # ---------------------------
@@ -108,6 +129,8 @@ def read_gui_options():
         "break_on_rough_second": False,
         "break_on_dash": False,
         "break_on_punctuation": False,
+        "same_sound_only": False,
+
 
         # NEW: which hiatus types to detect
         "detect_intra": True,
@@ -152,6 +175,7 @@ def detect_hiatus_in_text(text,
     detect_inter = gui_opts["detect_inter"]
     detect_across = gui_opts["detect_across"]
     clusters = grapheme_clusters(text)
+    same_sound_only = gui_opts["same_sound_only"]
 
     def line_number_at(idx):
         return text.count("\n", 0, idx)
@@ -278,6 +302,14 @@ def detect_hiatus_in_text(text,
 
             if is_diph:
                 break
+
+            # ----- SAME-SOUND HIATUS FILTER -----
+            if same_sound_only:
+                v1 = vowel_nucleus([clusters[k]['text'] for k in vowel_i_indices])
+                v2 = vowel_nucleus([clusters[k]['text'] for k in vowel_j_indices])
+
+                if not v1 or not v2 or v1 != v2:
+                continue
 
             occurrences.append({
                 "kind": kind,
