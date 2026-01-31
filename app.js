@@ -307,7 +307,9 @@ async function runDetector(text) {
         break_on_rough_second: document.getElementById("breakOnRoughSecond").checked,
         detect_intra: document.getElementById("detectIntra").checked,
         detect_inter: document.getElementById("detectInter").checked,
-        detect_across: document.getElementById("detectAcross").checked
+        detect_across: document.getElementById("detectAcross").checked,
+        same_sound_only: document.getElementById("sameSoundOnly")?.checked ?? false
+
     };
 
     pyodide.FS.writeFile("/options.json", JSON.stringify(options));
