@@ -309,7 +309,7 @@ def detect_hiatus_in_text(text,
                 v2 = vowel_nucleus([clusters[k]['text'] for k in vowel_j_indices])
 
                 if not v1 or not v2 or v1 != v2:
-                continue
+                    continue
 
             occurrences.append({
                 "kind": kind,
