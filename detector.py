@@ -305,9 +305,10 @@ def detect_hiatus_in_text(text,
 
             # ----- SAME-SOUND HIATUS FILTER -----
             if same_sound_only:
-                v1 = vowel_nucleus([clusters[k]['text'] for k in vowel_i_indices])
-                v2 = vowel_nucleus([clusters[k]['text'] for k in vowel_j_indices])
+                v1 = vowel_nucleus([ci['text']])
+                v2 = vowel_nucleus([cj['text']])
 
+                # reject if either vowel is invalid or nuclei differ
                 if not v1 or not v2 or v1 != v2:
                     continue
 
