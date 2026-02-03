@@ -69,6 +69,15 @@ def base_letter(cluster_text):
             return ch.lower()
     return ""
 
+def contains_accent(cluster_text):
+    nfd = unicodedata.normalize("NFD", cluster_text)
+    for ch in nfd:
+        if unicodedata.category(ch) == "Mn":
+            # acute, grave, circumflex
+            if ch in {"\u0301", "\u0300", "\u0342"}:
+                return True
+    return False
+
 def contains_combining_diaeresis(cluster_text):
     if any(ch in PRECOMPOSED_DIAERESIS for ch in cluster_text):
         return True
@@ -293,6 +302,10 @@ def detect_hiatus_in_text(text,
                 pair = b1 + b2
                 if pair in DIPHTHONGS:
                     is_diph = True
+                    
+                    # accent on first vowel breaks diphthong
+                    if contains_accent(ci['text']):
+                        is_diph = False
                 if treat_iota_as_diphthong and (contains_iota_subscript(ci['text']) or contains_iota_subscript(cj['text'])):
                     is_diph = True
                 if contains_combining_diaeresis(cj['text']):
