@@ -160,6 +160,10 @@ def read_gui_options():
 
     return opts
 
+def vowel_nucleus_from_indices(clusters, indices):
+    texts = [clusters[i]['text'] for i in indices]
+    return vowel_nucleus(texts)
+
 # ---------------------------
 # Core detection
 # ---------------------------
@@ -318,12 +322,29 @@ def detect_hiatus_in_text(text,
 
             # ----- SAME-SOUND HIATUS FILTER -----
             if same_sound_only:
-                v1 = vowel_nucleus([ci['text']])
-                v2 = vowel_nucleus([cj['text']])
+                # determine full vowel units (monophthong or diphthong)
 
-                # reject if either vowel is invalid or nuclei differ
+                vowel_i_indices = [i]
+                vowel_j_indices = [j]
+
+                # expand first vowel (left and right)
+                if i + 1 < j and safe_base(i) + safe_base(i + 1) in DIPHTHONGS:
+                    vowel_i_indices = [i, i + 1]
+                elif i - 1 >= 0 and safe_base(i - 1) + safe_base(i) in DIPHTHONGS:
+                    vowel_i_indices = [i - 1, i]
+
+                # expand second vowel (left and right)
+                if j - 1 > i and safe_base(j - 1) + safe_base(j) in DIPHTHONGS:
+                    vowel_j_indices = [j - 1, j]
+                elif j + 1 < len(clusters) and safe_base(j) + safe_base(j + 1) in DIPHTHONGS:
+                    vowel_j_indices = [j, j + 1]
+
+                v1 = vowel_nucleus_from_indices(clusters, vowel_i_indices)
+                v2 = vowel_nucleus_from_indices(clusters, vowel_j_indices)
+
                 if not v1 or not v2 or v1 != v2:
                     continue
+
 
             occurrences.append({
                 "kind": kind,
