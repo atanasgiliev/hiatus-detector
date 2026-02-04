@@ -7,7 +7,7 @@ from pathlib import Path
 from collections import defaultdict
 
 # ----- configuration -----
-DIPHTHONGS = {"αι","αυ","ει","ευ","οι","ου","υι","ωι","ῃ","ῳ"}
+DIPHTHONGS = {"αι","αυ","ει","ευ","οι","ου","υι","ωι","ηι","ῃ","ῳ","ᾳ"}
 PRECOMPOSED_DIAERESIS = set(["ϊ","ΐ","ϋ","ΰ","Ϊ","Ϋ"])
 COMBINING_DIAERESIS = "\u0308"
 IOTA_SUBSCRIPT = "\u0345"
