@@ -16,6 +16,71 @@
       </p>
     </header>
 
+    <details class="help-box">
+  <summary><strong>Help & Usage</strong></summary>
+
+  <div class="help-content">
+    <h3>How to use the detector</h3>
+    <ol>
+      <li>Upload or paste a Greek text file.</li>
+      <li>Choose whether you want normal detection or “same sound only”.</li>
+      <li>Run the detector.</li>
+      <li>Results will appear below with line numbers and statistics.</li>
+    </ol>
+
+    <h3>What counts as a hiatus?</h3>
+    <p>
+      A hiatus occurs when one vowel is immediately followed by another vowel
+      and they do not form a diphthong.
+    </p>
+
+    <h4>Examples of hiatus</h4>
+    <ul>
+      <li>α ε</li>
+      <li>ο α</li>
+      <li>η ω</li>
+    </ul>
+
+    <h3>What does NOT count as hiatus?</h3>
+
+    <h4>Regular diphthongs</h4>
+    <p>αι, ει, οι, αυ, ευ, ου, ηυ, ωυ</p>
+
+    <h4>Diphthongs with iota subscript / adscript</h4>
+    <p>ᾳ, ῃ, ῳ (and equivalent forms)</p>
+
+    <h4>Broken diphthongs (these DO count as hiatus)</h4>
+    <ul>
+      <li>αϊ (diaeresis)</li>
+      <li>if the accent is on the first vowel of the pair</li>
+    </ul>
+
+    <h3>“Same sound only” option</h3>
+    <p>
+      When enabled, the detector reports only hiatuses where both vowels
+      have the same base sound.
+    </p>
+
+    <h4>Examples detected</h4>
+    <ul>
+      <li>α α</li>
+      <li>ο ο</li>
+      <li>οι οι</li>
+    </ul>
+
+    <h4>Examples ignored</h4>
+    <ul>
+      <li>α ε</li>
+      <li>ο αι</li>
+    </ul>
+
+    <p>
+      Accents and breathings are ignored when comparing sounds.
+    </p>
+  </div>
+</details>
+
+
     <!-- File input -->
     <section class="panel">
       <label class="file-label">
