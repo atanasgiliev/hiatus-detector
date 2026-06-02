@@ -25,7 +25,7 @@
         <div class="help-content">
           <h3>How to use the detector</h3>
           <ol>
-            <li>Upload or paste a Greek text file.</li>
+            <li>Upload a Greek text file <em>or</em> paste text directly into the box below.</li>
             <li>Choose whether you want normal detection or "same sound only".</li>
             <li>Run the detector.</li>
             <li>Results will appear below with line numbers and statistics.</li>
@@ -83,12 +83,16 @@
         </div>
       </details>
 
-      <!-- File input -->
+      <!-- File input + paste -->
       <section class="panel">
         <label class="file-label">
-          Select a UTF-8 encoded Greek text file
+          Upload a UTF-8 encoded Greek text file
         </label>
         <input type="file" id="fileInput" accept=".txt">
+        <p class="note" style="margin-top:0.75rem;">— or paste Greek text directly —</p>
+        <textarea id="pasteArea" rows="6"
+                  placeholder="Paste Ancient Greek verse here…"
+                  spellcheck="false"></textarea>
       </section>
 
       <!-- Options -->
@@ -111,9 +115,7 @@
             Across-line (verse) hiatus (line-final to line-initial)
           </label>
 
-          <p class="note">
-            At least one hiatus type must be selected.
-          </p>
+          <p class="note">At least one hiatus type must be selected.</p>
         </fieldset>
 
         <fieldset>
@@ -142,9 +144,7 @@
             </span>
           </label>
 
-          <p class="note">
-            These options are disabled by default.
-          </p>
+          <p class="note">These options are disabled by default.</p>
         </fieldset>
 
         <fieldset>
