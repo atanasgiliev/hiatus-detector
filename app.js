@@ -6,31 +6,82 @@ let lastCsvOutput = null;
 let lastPerLineCsv = null;
 let lastPerLineData = null;
 
+// the loaded text — set by either file input or paste area
+let loadedText = null;
+
 // sorting state
 let perLineSort = { col: "line", asc: true };
 
-/* === STEP 1: remember open/closed state of per-line table === */
+// remember open/closed state of per-line table
 let perLineTableOpen = false;
 
 /* ----------------------------
    RUN BUTTON ENABLE / DISABLE
+   Requires: text loaded AND at least one hiatus type checked
 ----------------------------- */
 
 function updateRunButtonState() {
-    const intra  = document.getElementById("detectIntra").checked;
-    const inter  = document.getElementById("detectInter").checked;
-    const across = document.getElementById("detectAcross").checked;
+    const hasText  = !!loadedText;
+    const hasType  = document.getElementById("detectIntra").checked
+                  || document.getElementById("detectInter").checked
+                  || document.getElementById("detectAcross").checked;
 
-    document.getElementById("runBtn").disabled = !(intra || inter || across);
+    document.getElementById("runBtn").disabled = !(hasText && hasType);
 }
+
+/* ----------------------------
+   INPUT LISTENERS
+   File input and paste area are mutually exclusive:
+   using one clears the other.
+----------------------------- */
 
 document.addEventListener("DOMContentLoaded", () => {
     updateRunButtonState();
 
+    // Hiatus-type checkboxes
     ["detectIntra", "detectInter", "detectAcross"].forEach(id => {
         document.getElementById(id).addEventListener("change", updateRunButtonState);
     });
+
+    // File input
+    document.getElementById("fileInput").addEventListener("change", () => {
+        const file = document.getElementById("fileInput").files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = e => {
+            loadedText = e.target.result;
+            // clear paste area
+            document.getElementById("pasteArea").value = "";
+            setStatus(`Loaded "${file.name}" (${loadedText.length.toLocaleString()} chars).`);
+            updateRunButtonState();
+        };
+        reader.readAsText(file, "utf-8");
+    });
+
+    // Paste area
+    document.getElementById("pasteArea").addEventListener("input", () => {
+        const val = document.getElementById("pasteArea").value.trim();
+        if (val) {
+            loadedText = document.getElementById("pasteArea").value;
+            // clear file input
+            document.getElementById("fileInput").value = "";
+        } else {
+            loadedText = null;
+        }
+        updateRunButtonState();
+    });
 });
+
+/* ----------------------------
+   STATUS HELPER
+----------------------------- */
+
+function setStatus(msg, isError = false) {
+    const el = document.getElementById("status");
+    el.textContent = msg;
+    el.className = isError ? "error" : "";
+}
 
 /* ----------------------------
    CSV → HIATUS COUNTS
@@ -94,13 +145,11 @@ function addLineNumbersToAnnotatedHTML(html) {
     const pre = doc.querySelector("pre.source");
     if (!pre) return html;
 
-    /* ---------- wrap lines ---------- */
     const lines = pre.innerHTML.split("\n");
     pre.innerHTML = lines
         .map(line => `<span class="line">${line || "&nbsp;"}</span>`)
         .join("\n");
 
-    /* ---------- inject CSS into iframe document ---------- */
     const style = doc.createElement("style");
     style.textContent = `
         pre.source {
@@ -128,9 +177,6 @@ function addLineNumbersToAnnotatedHTML(html) {
     return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
 }
 
-
-
-
 /* ----------------------------
    SORTABLE PER-LINE TABLE
 ----------------------------- */
@@ -149,15 +195,10 @@ function renderSparklineFromData(data) {
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
-    const scaleX = i =>
-        margin.left + (i / (lineCount - 1)) * innerW;
+    const scaleX = i => margin.left + (i / (lineCount - 1)) * innerW;
+    const scaleY = v => margin.top + innerH - (v / yMax) * innerH;
 
-    const scaleY = v =>
-        margin.top + innerH - (v / yMax) * innerH;
-
-    const points = counts
-        .map((v, i) => `${scaleX(i)},${scaleY(v)}`)
-        .join(" ");
+    const points = counts.map((v, i) => `${scaleX(i)},${scaleY(v)}`).join(" ");
 
     const x0 = margin.left;
     const x1 = margin.left + innerW;
@@ -165,27 +206,19 @@ function renderSparklineFromData(data) {
     const y1 = margin.top;
 
     const yTicks = Math.min(yMax, 6);
-    const yStep = Math.max(1, Math.ceil(yMax / yTicks));
+    const yStep  = Math.max(1, Math.ceil(yMax / yTicks));
 
     let xStep =
         lineCount <= 200 ? 25 :
-        lineCount <= 500 ? 50 :
-        100;
+        lineCount <= 500 ? 50 : 100;
 
     const xLabels = [];
     for (let i = 1; i <= lineCount; i += xStep) {
         const frac = (i - 1) / (lineCount - 1);
-        xLabels.push({
-            x: margin.left + frac * innerW,
-            label: i
-        });
+        xLabels.push({ x: margin.left + frac * innerW, label: i });
     }
-
     if (xLabels.at(-1)?.label !== lineCount) {
-        xLabels.push({
-            x: margin.left + innerW,
-            label: lineCount
-        });
+        xLabels.push({ x: margin.left + innerW, label: lineCount });
     }
 
     return `
@@ -194,39 +227,26 @@ function renderSparklineFromData(data) {
              style="width:100%; height:${height}px; display:block">
             <line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y0}" stroke="#000"/>
             <line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="#000"/>
-
             ${Array.from({ length: Math.floor(yMax / yStep) + 1 }, (_, i) => {
                 const v = i * yStep;
-                return `
-                    <text x="${x0 - 6}" y="${scaleY(v)}"
-                          text-anchor="end"
-                          dominant-baseline="middle"
-                          font-size="10">${v}</text>
-                `;
+                return `<text x="${x0 - 6}" y="${scaleY(v)}"
+                              text-anchor="end" dominant-baseline="middle"
+                              font-size="10">${v}</text>`;
             }).join("")}
-
             ${xLabels.map(l => `
                 <text x="${l.x}" y="${y0 + 18}"
-                      text-anchor="middle"
-                      font-size="10">${l.label}</text>
+                      text-anchor="middle" font-size="10">${l.label}</text>
             `).join("")}
-
-            <polyline
-                fill="none"
-                stroke="#444"
-                stroke-width="1"
-                points="${points}"
-            />
+            <polyline fill="none" stroke="#444" stroke-width="1" points="${points}"/>
         </svg>
     `;
 }
 
-/* === STEP 3: render table with remembered open/closed state === */
 function renderPerLineTable(forceOpen = null) {
     if (!lastPerLineData) return "";
 
     const data = [...lastPerLineData];
-    const max = Math.max(...data.map(d => d.count));
+    const max  = Math.max(...data.map(d => d.count));
 
     data.sort((a, b) => {
         const key = perLineSort.col;
@@ -235,11 +255,9 @@ function renderPerLineTable(forceOpen = null) {
     });
 
     const shouldBeOpen =
-        forceOpen !== null
-            ? forceOpen
-            : lastPerLineData.length <= 50;
+        forceOpen !== null ? forceOpen : lastPerLineData.length <= 50;
 
-    let rows = data.map(d => `
+    const rows = data.map(d => `
         <tr style="background:${heatColor(d.count, max)}">
             <td>${d.line}</td>
             <td>${d.count}</td>
@@ -254,25 +272,18 @@ function renderPerLineTable(forceOpen = null) {
             <summary style="cursor:pointer; font-weight:600;">
                 Hiatus per Line (click to expand)
             </summary>
-
             <table border="1" cellpadding="6" style="margin-top:8px;">
                 <tr>
-                    <th style="cursor:pointer" onclick="sortPerLine('line')">
-                        Line${arrow("line")}
-                    </th>
-                    <th style="cursor:pointer" onclick="sortPerLine('count')">
-                        #${arrow("count")}
-                    </th>
+                    <th style="cursor:pointer" onclick="sortPerLine('line')">Line${arrow("line")}</th>
+                    <th style="cursor:pointer" onclick="sortPerLine('count')">#${arrow("count")}</th>
                 </tr>
                 ${rows}
             </table>
         </details>
-
         ${renderSparklineFromData(lastPerLineData)}
     `;
 }
 
-/* === STEP 2: capture open/closed state before re-render === */
 function sortPerLine(col) {
     const details = document.querySelector("#perLineContainer details");
     perLineTableOpen = details ? details.open : false;
@@ -302,14 +313,13 @@ async function runDetector(text) {
     await pyodide.runPythonAsync(`import detector`);
 
     const options = {
-        break_on_dash: document.getElementById("breakOnDash").checked,
+        break_on_dash:        document.getElementById("breakOnDash").checked,
         break_on_punctuation: document.getElementById("breakOnPunctuation").checked,
-        break_on_rough_second: document.getElementById("breakOnRoughSecond").checked,
-        detect_intra: document.getElementById("detectIntra").checked,
-        detect_inter: document.getElementById("detectInter").checked,
-        detect_across: document.getElementById("detectAcross").checked,
-        same_sound_only: document.getElementById("sameSoundOnly")?.checked ?? false
-
+        break_on_rough_second:document.getElementById("breakOnRoughSecond").checked,
+        detect_intra:         document.getElementById("detectIntra").checked,
+        detect_inter:         document.getElementById("detectInter").checked,
+        detect_across:        document.getElementById("detectAcross").checked,
+        same_sound_only:      document.getElementById("sameSoundOnly")?.checked ?? false,
     };
 
     pyodide.FS.writeFile("/options.json", JSON.stringify(options));
@@ -325,7 +335,7 @@ write_outputs(annotated, occ, Path("/out.html"), Path("/out.csv"))
 
     return {
         html: pyodide.FS.readFile("/out.html", { encoding: "utf8" }),
-        csv:  pyodide.FS.readFile("/out.csv",  { encoding: "utf8" })
+        csv:  pyodide.FS.readFile("/out.csv",  { encoding: "utf8" }),
     };
 }
 
@@ -335,15 +345,13 @@ write_outputs(annotated, occ, Path("/out.html"), Path("/out.csv"))
 
 function downloadFile(filename, content, mime) {
     const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-
     URL.revokeObjectURL(url);
 }
 
@@ -352,19 +360,19 @@ function downloadFile(filename, content, mime) {
 ----------------------------- */
 
 document.getElementById("runBtn").onclick = async () => {
-    const input = document.getElementById("fileInput").files[0];
-    if (!input) return alert("Please select a .txt file first.");
+    if (!loadedText) {
+        setStatus("Please upload a file or paste Greek text first.", true);
+        return;
+    }
 
-    const status = document.getElementById("status");
     const output = document.getElementById("output");
-
-    status.textContent = "Running detector…";
     output.innerHTML = "";
+    setStatus("Running detector…");
 
     try {
-        const text = await input.text();
+        const text      = loadedText;
         const lineCount = text.split(/\r?\n/).filter(l => l.trim()).length;
-        const result = await runDetector(text);
+        const result    = await runDetector(text);
 
         lastHtmlOutput = result.html;
         lastCsvOutput  = result.csv;
@@ -375,13 +383,12 @@ document.getElementById("runBtn").onclick = async () => {
             : "0.000";
 
         let perLineSection = "";
-        lastPerLineCsv = null;
+        lastPerLineCsv  = null;
         lastPerLineData = null;
 
         if (document.getElementById("showPerLineTable").checked) {
             const perLine = countHiatusPerLine(result.csv, lineCount);
             const csvRows = ["line,hiatus_count"];
-
             lastPerLineData = [];
 
             for (let i = 1; i <= lineCount; i++) {
@@ -390,16 +397,14 @@ document.getElementById("runBtn").onclick = async () => {
             }
 
             lastPerLineCsv = csvRows.join("\n");
-
             perLineSection = `<div id="perLineContainer">
                 ${renderPerLineTable()}
             </div>`;
         }
 
-        document.getElementById("downloadPerLineCsvBtn").disabled =
-            !lastPerLineCsv;
+        document.getElementById("downloadPerLineCsvBtn").disabled = !lastPerLineCsv;
 
-        status.textContent = "Done!";
+        setStatus("Done!");
         output.innerHTML = `
             <h3>Hiatus Counts</h3>
             <ul>
@@ -417,10 +422,10 @@ document.getElementById("runBtn").onclick = async () => {
         `;
 
         document.getElementById("downloadHtmlBtn").disabled = false;
-        document.getElementById("downloadCsvBtn").disabled = false;
+        document.getElementById("downloadCsvBtn").disabled  = false;
 
     } catch (err) {
-        status.textContent = "Error running detector.";
+        setStatus("Error running detector.", true);
         console.error(err);
     }
 };
