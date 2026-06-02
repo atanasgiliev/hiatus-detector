@@ -231,6 +231,52 @@ input[type="file"] {
   display: block;
 }
 
+/* Paste-area divider */
+.paste-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.1rem 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.paste-divider::before,
+.paste-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+textarea#pasteArea {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: var(--ink);
+  background: var(--parchment);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  resize: vertical;
+  min-height: 200px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+textarea#pasteArea:focus {
+  outline: none;
+  border-color: var(--green-dart);
+  box-shadow: 0 0 0 2px rgba(0, 105, 62, 0.1);
+}
+
+textarea#pasteArea::placeholder {
+  color: rgba(112, 112, 112, 0.55);
+  font-style: italic;
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    FIELDSETS / OPTIONS
    ════════════════════════════════════════════════════════════════════════════ */
